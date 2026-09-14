@@ -101,7 +101,12 @@ function normalize(config: FrameworkConfiguration): FrameworkConfiguration {
   for (const policy of Object.values(normalized.models.roles)) {
     policy.allowed = sortedUnique(policy.allowed);
   }
-  normalized.providers = Object.fromEntries(Object.entries(normalized.providers).sort(([left], [right]) => left.localeCompare(right)));
+  normalized.providers = Object.fromEntries(Object.entries(normalized.providers)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([provider, policy]) => {
+      const mode = policy.requiredMode ?? (provider === "claude" ? "enforced" : "instructions");
+      return [provider, { ...policy, requiredMode: policy.enabled ? mode : "off" }];
+    })) as FrameworkConfiguration["providers"];
   normalized.models.roles = Object.fromEntries(Object.entries(normalized.models.roles).sort(([left], [right]) => left.localeCompare(right)));
   return normalized;
 }

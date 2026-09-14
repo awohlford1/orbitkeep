@@ -9,7 +9,7 @@ import { applyRawResponseCleanup, planRawResponseCleanup } from "../cleanup/inde
 import { AssignmentSelectionError, resolveAssignmentReference, WorkflowCommandService, StateWorkflowRepository, runConsequentialOperation } from "../commands/index.ts";
 import { loadEffectiveConfiguration } from "../config/index.ts";
 import { MANAGED_WORKFLOW_COMMANDS, type ActorRef } from "../contracts/index.ts";
-import { installConsumer, findConsumerRoot } from "../installer/index.ts";
+import { applyRepair, installConsumer, findConsumerRoot, planRepair } from "../installer/index.ts";
 import { appendEvent } from "../events/index.ts";
 import { coreSchemaRegistry } from "../registries/index.ts";
 import { initializeStateRoot, writeJsonAtomic } from "../storage/index.ts";
@@ -452,12 +452,13 @@ export async function runCli(): Promise<void> {
   const root = await findConsumerRoot(option("project-root") ?? process.cwd());
   const [command, subcommand] = process.argv.slice(2).filter((value) => !value.startsWith("--") && value !== option("json") && value !== option("project-root"));
   if (!command || command === "help" || process.argv.includes("--help") || process.argv.includes("-h")) { output({ commands: [
-    "init", "doctor", "validate", "capabilities", "config show", "config validate", "upgrade --check", "--redact-output",
+    "init", "repair --plan|--apply", "doctor", "validate", "capabilities", "config show", "config validate", "upgrade --check", "--redact-output",
     "cleanup --dry-run|--apply", "archive --dry-run|--apply",
     "control launch|status|acknowledge-handover",
     ...MANAGED_WORKFLOW_COMMANDS,
   ] }); return; }
   if (command === "init") { output(await installConsumer(root)); return; }
+  if (command === "repair") { output(process.argv.includes("--apply") ? await applyRepair(root) : await planRepair(root)); return; }
   if (command === "doctor") { output(await doctor(root)); return; }
   if (command === "validate") { output(await validateInstallation(root)); return; }
   if (command === "capabilities") { output(await capabilityReport()); return; }

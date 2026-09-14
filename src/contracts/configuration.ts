@@ -2,6 +2,7 @@ export type ApprovalRequirement = "required" | "not_required";
 export type InterruptionMode = "graceful" | "force";
 export type AmbiguityBehavior = "hold_affected_work";
 export type ModelFallbackPolicy = "require_authorization" | "reject";
+export type ProviderRequiredMode = "off" | "instructions" | "observed" | "enforced" | "brokered";
 
 export interface FrameworkConfiguration {
   schemaVersion: "1.0";
@@ -36,7 +37,11 @@ export interface FrameworkConfiguration {
     fallback: ModelFallbackPolicy;
     roles: Record<string, { allowed: string[] }>;
   };
-  providers: Record<string, { enabled: boolean; captureRawResponses?: boolean }>;
+  providers: Record<string, {
+    enabled: boolean;
+    requiredMode?: ProviderRequiredMode;
+    captureRawResponses?: boolean;
+  }>;
   security: {
     stateRootContainment: true;
     secretRedaction: true;

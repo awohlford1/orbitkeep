@@ -179,8 +179,9 @@ export function validateConfigurationLayer(input: unknown, source = "configurati
   if (withoutSchema.providers !== undefined) {
     for (const [provider, policyValue] of Object.entries(object(withoutSchema.providers, `${source}.providers`))) {
       const policy = object(policyValue, `${source}.providers.${provider}`);
-      assertKnownKeys(policy, { enabled: true, captureRawResponses: true }, `${source}.providers.${provider}`);
+      assertKnownKeys(policy, { enabled: true, requiredMode: true, captureRawResponses: true }, `${source}.providers.${provider}`);
       if (policy.enabled !== undefined) assertBoolean(policy.enabled, `${source}.providers.${provider}.enabled`);
+      if (policy.requiredMode !== undefined && !["off", "instructions", "observed", "enforced", "brokered"].includes(policy.requiredMode as string)) invalid(`providers.${provider}.requiredMode`, source);
       if (policy.captureRawResponses !== undefined) assertBoolean(policy.captureRawResponses, `${source}.providers.${provider}.captureRawResponses`);
     }
   }

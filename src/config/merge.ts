@@ -66,7 +66,7 @@ export function applyProviderRestrictions(
 ): FrameworkConfiguration {
   const result = structuredClone(base);
   for (const provider of disabledProviders) {
-    result.providers[provider] = { ...result.providers[provider], enabled: false };
+    result.providers[provider] = { ...result.providers[provider], enabled: false, requiredMode: "off" };
   }
   return result;
 }

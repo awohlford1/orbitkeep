@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0",
   "providers": {
-    "claude": { "enabled": true, "captureRawResponses": false },
-    "codex": { "enabled": true, "captureRawResponses": false }
+    "claude": { "enabled": true, "requiredMode": "enforced", "captureRawResponses": false },
+    "codex": { "enabled": true, "requiredMode": "instructions", "captureRawResponses": false }
   },
   "heartbeat": { "enabled": false, "intervalSeconds": 300 },
   "retention": { "rawResponsesDays": 7, "closedAssignmentsDays": 30 },

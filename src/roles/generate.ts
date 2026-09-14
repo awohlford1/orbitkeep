@@ -10,7 +10,7 @@ interface Role {
 interface Catalogue { schemaVersion: string; roles: Role[] }
 
 const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
-const defaultProjectRoot = path.resolve(packageRoot, "../..");
+const defaultProjectRoot = packageRoot;
 
 export function roleInstructions(role: Role): string {
   const disposition = role.dispositions?.length ? `\n\nReturn one of these dispositions: ${role.dispositions.map((item) => `\`${item}\``).join(", ")}.` : "";

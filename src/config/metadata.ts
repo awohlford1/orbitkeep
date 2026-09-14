@@ -58,6 +58,7 @@ export const SETTING_AUTHORITIES: readonly SettingAuthority[] = [
   projectAndAssignment("models.fallback"),
   projectAndAssignment("models.roles.*.allowed"),
   projectOnly("providers.*.enabled"),
+  projectOnly("providers.*.requiredMode"),
   projectOnly("providers.*.captureRawResponses"),
   projectOnly("security.executiveApproval.mode"),
   projectOnly("security.executiveApproval.trustedPublicKeys.*"),

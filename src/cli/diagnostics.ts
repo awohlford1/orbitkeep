@@ -2,14 +2,14 @@ import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEffectiveConfiguration } from "../config/index.ts";
-import { PINNED_AGENT_WORKFLOW_COMMAND } from "../installer/index.ts";
+import { PINNED_AGENT_WORKFLOW_COMMAND, planRepair } from "../installer/index.ts";
 import { CLAUDE_HOOK_EVENTS, ClaudeProviderAdapter } from "../providers/claude/index.ts";
 import { CodexProviderAdapter } from "../providers/codex/index.ts";
 import { coreSchemaRegistry } from "../registries/index.ts";
 import { resolveStatePaths } from "../storage/index.ts";
 import { generateRoles, loadRoleCatalogue } from "../roles/generate.ts";
 
-export const FRAMEWORK_VERSION = "0.1.6";
+export const FRAMEWORK_VERSION = "0.3.0";
 export const SUPPORTED_SCHEMA_VERSION = "1.0";
 
 async function exists(filename: string): Promise<boolean> { try { await access(filename); return true; } catch { return false; } }
@@ -32,6 +32,27 @@ export async function inspectClaudeHooks(filename: string): Promise<ClaudeHookIn
 
 async function hasCodexIntegration(filename: string): Promise<boolean> {
   return readFile(filename, "utf8").then((text) => text.includes("Agent Workflow CLI Integration") && text.includes("pinned Agent Workflow CLI")).catch(() => false);
+}
+
+async function hasClaudeIntegration(filename: string): Promise<boolean> {
+  return readFile(filename, "utf8").then((text) => text.includes("Agent Workflow Manager Integration") && text.includes("Agent Workflow CLI")).catch(() => false);
+}
+
+type ProviderActivationStatus = "off" | "active" | "repair_required" | "unsupported";
+
+function assessProviderActivation(provider: string, enabled: boolean, configuredMode: string | undefined, integrations: { claude: boolean; codex: boolean }, hooks: ClaudeHookInspection): { status: ProviderActivationStatus; requiredMode: string; reason: string } {
+  const requiredMode = configuredMode ?? (provider === "claude" ? "enforced" : "instructions");
+  if (!enabled || requiredMode === "off") return { status: "off", requiredMode: "off", reason: "The provider is not requested by project policy." };
+  if (provider === "claude") {
+    if (requiredMode === "brokered") return { status: "unsupported", requiredMode, reason: "Brokered Claude execution is not yet installed by the consumer bootstrap." };
+    if (requiredMode === "instructions") return integrations.claude ? { status: "active", requiredMode, reason: "Claude Manager instructions are installed." } : { status: "repair_required", requiredMode, reason: "Claude Manager instructions are missing." };
+    return hooks.valid ? { status: "active", requiredMode, reason: "Claude hooks meet the requested workflow mode." } : { status: "repair_required", requiredMode, reason: `Claude hooks are incomplete (missing: ${hooks.missing.join(", ") || "none"}; unpinned: ${hooks.mismatched.join(", ") || "none"}).` };
+  }
+  if (provider === "codex") {
+    if (requiredMode !== "instructions") return { status: "unsupported", requiredMode, reason: `Codex ${requiredMode} mode is not established by Manager instructions alone.` };
+    return integrations.codex ? { status: "active", requiredMode, reason: "Codex Manager instructions are installed." } : { status: "repair_required", requiredMode, reason: "Codex Manager instructions are missing." };
+  }
+  return { status: "unsupported", requiredMode, reason: `No installer adapter is available for provider ${provider}.` };
 }
 
 async function staleJsonCount(directory: string): Promise<number> {
@@ -93,6 +114,7 @@ export async function doctor(projectRoot: string) {
   try { stateRoot = (await resolveStatePaths(projectRoot, effective?.config.state.directory)).stateRoot; } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
   const claudeHooks = await inspectClaudeHooks(path.join(projectRoot, ".claude", "settings.json"));
   const codexIntegrated = await hasCodexIntegration(path.join(projectRoot, "AGENTS.md"));
+  const claudeIntegrated = await hasClaudeIntegration(path.join(projectRoot, "CLAUDE.md"));
   if ((effective?.config.providers.claude?.enabled ?? false) && !claudeHooks.valid) warnings.push(`Claude hook integration is incomplete (missing: ${claudeHooks.missing.join(", ") || "none"}; unpinned: ${claudeHooks.mismatched.join(", ") || "none"}).`);
   if ((effective?.config.providers.codex?.enabled ?? false) && !codexIntegrated) warnings.push("Codex manager instructions do not reference the pinned Agent Workflow CLI.");
   const requiredContracts = ["README.md", "MANAGER.md", "CONTRACTS.md", "ROLES.md"];
@@ -132,12 +154,16 @@ export async function doctor(projectRoot: string) {
   const installedFromNodeModules = normalizedPackageRelative === "node_modules/@agent-workflow/cli" || normalizedPackageRelative.startsWith("node_modules/@agent-workflow/cli/");
   if (packageRelative === "" || (!packageRelative.startsWith("..") && !path.isAbsolute(packageRelative) && !installedFromNodeModules)) warnings.push("The active Agent Workflow CLI is workspace-linked and mutable; create a pinned packaged installation before treating the integration as release-ready.");
   info.push("Local ignored state is not a backup.", "Live cross-provider process takeover is unsupported.");
+  const providerStatuses = Object.fromEntries(Object.entries(effective?.config.providers ?? {}).sort(([left], [right]) => left.localeCompare(right)).map(([provider, policy]) => [provider, assessProviderActivation(provider, policy.enabled, policy.requiredMode, { claude: claudeIntegrated, codex: codexIntegrated }, claudeHooks)]));
+  const providerFailures = Object.values(providerStatuses).filter((item) => item.status === "repair_required" || item.status === "unsupported");
+  const managedRepair = await planRepair(projectRoot);
+  const activation = errors.length > 0 ? "blocked" : managedRepair.actions.length > 0 || providerFailures.some((item) => item.status === "repair_required") ? "repair_required" : providerFailures.length > 0 ? "blocked" : Object.values(providerStatuses).some((item) => item.status === "active") ? "active" : "active_limited";
   const capabilities = await capabilityReport({ claudeBlockingHook: claudeHooks.valid, claudeWorkflowAuthorizationConnected: claudeHooks.valid });
   return {
     healthy: errors.length === 0, frameworkVersion: FRAMEWORK_VERSION, configurationSchemaVersion: SUPPORTED_SCHEMA_VERSION, recordSchemaVersion: SUPPORTED_SCHEMA_VERSION, eventSchemaVersion: SUPPORTED_SCHEMA_VERSION,
     configurationDigest: effective?.digest, stateRoot, stateRootSafety: { contained: !path.relative(projectRoot, stateRoot).startsWith(".."), gitignored: stateRootIgnored, ignoredPath },
     enabledProviders: Object.entries(effective?.config.providers ?? {}).filter(([, value]) => value.enabled).map(([name]) => name).sort(),
-    integrations: { claude: claudeHooks.valid, codex: codexIntegrated }, hookInspection: { claude: claudeHooks }, capabilities,
+    activation, providerActivation: providerStatuses, repair: managedRepair, integrations: { claude: claudeHooks.valid, codex: codexIntegrated }, hookInspection: { claude: claudeHooks }, capabilities,
     contracts: { valid: missingContracts.length === 0, missing: missingContracts },
     roles: { valid: unknownRoles.length === 0 && missingRoleAdapters.length === 0 && roleGeneration.valid, configured: configuredRoles, unknown: unknownRoles, missingAdapters: missingRoleAdapters, drift: roleGeneration.mismatches },
     schemas: { registryComplete, recordTypes: coreSchemaRegistry.recordTypes().length, eventTypes: coreSchemaRegistry.eventTypes().length, extensions: Object.keys(effective?.extensions ?? {}) },
@@ -150,6 +176,5 @@ export async function doctor(projectRoot: string) {
 
 export async function validateInstallation(projectRoot: string) {
   const report = await doctor(projectRoot);
-  const requiredIntegrationsValid = (!report.enabledProviders.includes("claude") || report.hookInspection.claude.valid) && (!report.enabledProviders.includes("codex") || report.integrations.codex);
-  return { valid: report.healthy && requiredIntegrationsValid && report.contracts.valid && report.roles.valid, configurationDigest: report.configurationDigest, integration: { claude: report.integrations.claude, codex: report.integrations.codex }, errors: report.errors, warnings: report.warnings, schemas: report.schemas, contracts: report.contracts, roles: report.roles };
+  return { valid: report.healthy && report.activation !== "blocked" && report.activation !== "repair_required" && report.contracts.valid && report.roles.valid, activation: report.activation, providerActivation: report.providerActivation, configurationDigest: report.configurationDigest, integration: { claude: report.integrations.claude, codex: report.integrations.codex }, errors: report.errors, warnings: report.warnings, schemas: report.schemas, contracts: report.contracts, roles: report.roles };
 }

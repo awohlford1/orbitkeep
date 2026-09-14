@@ -80,7 +80,11 @@
         "cancel",
         "close",
         "reopen",
-        "ownership-acquire"
+        "ownership-acquire",
+        "transcript-record",
+        "quarantine-submit",
+        "quarantine-show",
+        "quarantine-resolve"
       ]
     }
   },

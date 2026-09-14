@@ -20,6 +20,25 @@ npx agent-workflow init
 npx agent-workflow doctor
 ```
 
+Successful initialization reports an overall activation state and a separate
+status for each configured provider. A requested provider mode is never
+silently downgraded: unsupported or incomplete required integration blocks that
+provider and is reported as `blocked` or `repair_required`.
+
+For an incomplete or drifted installation, inspect the read-only repair plan
+before applying it:
+
+```sh
+npx agent-workflow repair --plan
+npx agent-workflow repair --apply
+```
+
+Repair restores only package-managed files recorded in the installation
+manifest and reconciles recognized Manager/hook integration points. Existing
+files are backed up under the ignored `.agent-state/installation-backups/`
+directory before replacement. Malformed user-owned JSON is reported for manual
+correction and is never overwritten automatically.
+
 For local development before publication:
 
 ```sh

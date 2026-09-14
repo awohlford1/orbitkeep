@@ -292,6 +292,15 @@
           "enabled": {
             "type": "boolean"
           },
+          "requiredMode": {
+            "enum": [
+              "off",
+              "instructions",
+              "observed",
+              "enforced",
+              "brokered"
+            ]
+          },
           "captureRawResponses": {
             "type": "boolean",
             "default": false
