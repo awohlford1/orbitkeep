@@ -45,6 +45,7 @@
     "./defaults/config.json": "./defaults/config.json"
   },
   "scripts": {
+    "prepare": "npm run build",
     "build": "tsc -p tsconfig.build.json",
     "lint": "npm run build && tsc --noEmit",
     "test": "npm run build && node --test tests/**/*.test.ts",
