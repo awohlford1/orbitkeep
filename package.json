@@ -1,0 +1,59 @@
+{
+  "name": "@agent-workflow/cli",
+  "version": "0.2.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "Provider-neutral, auditable workflow runtime for Claude Code and Codex CLI managers.",
+  "keywords": [
+    "agent-workflow",
+    "claude-code",
+    "codex",
+    "multi-agent",
+    "governance"
+  ],
+  "files": [
+    "dist",
+    "contracts",
+    "defaults",
+    "integrations",
+    "roles",
+    "schemas",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "agent-workflow": "dist/cli/index.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./contracts": "./dist/contracts/index.js",
+    "./config": "./dist/config/index.js",
+    "./commands": "./dist/commands/index.js",
+    "./storage": "./dist/storage/index.js",
+    "./evidence": "./dist/evidence/index.js",
+    "./providers/claude": "./dist/providers/claude/index.js",
+    "./providers/codex": "./dist/providers/codex/index.js",
+    "./installer": "./dist/installer/index.js",
+    "./defaults/config.json": "./defaults/config.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "npm run build && tsc --noEmit",
+    "test": "npm run build && node --test tests/**/*.test.ts",
+    "test:integration": "node --test tests/integration/*.test.ts",
+    "test:conformance": "node --test tests/conformance/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "roles:generate": "node src/roles/generate.ts",
+    "roles:check": "node src/roles/generate.ts --check"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.0",
+    "typescript": "^5.9.0"
+  }
+}
