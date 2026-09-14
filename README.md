@@ -132,6 +132,28 @@ The package includes templates for both Claude Code and Codex CLI. Capability
 and provider-session behavior is detected at runtime; the runtime never claims
 to control a provider action without observable confirmation.
 
+## Roadmap
+
+The planned release sequence keeps the local governance runtime useful while
+adding orchestration and isolation in bounded stages:
+
+- **v0.4 — Developer preview:** transactional setup, repair, upgrade and
+  rollback; provider-neutral Claude Code and Codex CLI management; durable
+  workflow records, lifecycle controls, and release verification.
+- **v0.5 — Workflow completion:** enforced task dependencies and quality
+  gates, execution budgets, reusable workflow templates, cross-platform
+  compatibility, and provider-neutral usage telemetry with local reporting.
+- **v0.6 — Isolated execution:** an optional Docker execution adapter with
+  per-task worktrees, resource and timeout limits, network and secret policies,
+  result capture, cleanup, and recovery.
+- **Later platform releases:** remote runners, a central control plane,
+  organization policies, analytics and optimization dashboards, and shared
+  artifact services.
+
+The local CLI remains usable without Docker. Container isolation becomes the
+recommended backend when agents run concurrently, operate unattended, or need
+broad tool and shell permissions.
+
 ## Publishing
 
 The current package name is reserved as `@agent-workflow/cli`. Before the first
