@@ -4,6 +4,14 @@
   "license": "MIT",
   "type": "module",
   "description": "Provider-neutral, auditable workflow runtime for Claude Code and Codex CLI managers.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/awohlford1/agent-workflow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/awohlford1/agent-workflow/issues"
+  },
+  "homepage": "https://github.com/awohlford1/agent-workflow#readme",
   "keywords": [
     "agent-workflow",
     "claude-code",
