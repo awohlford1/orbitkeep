@@ -20,6 +20,7 @@ export interface FrameworkMigration { id: string; fromVersion: string; toVersion
 export const FRAMEWORK_MIGRATIONS: readonly FrameworkMigration[] = [
   { id: "migration-0.3.0-to-0.4.0", fromVersion: "0.3.0", toVersion: "0.4.0", reversible: true, migrateConfig: true, migrateState: true },
   { id: "migration-0.4.0-to-0.4.1", fromVersion: "0.4.0", toVersion: "0.4.1", reversible: true, migrateConfig: false, migrateState: true },
+  { id: "migration-0.4.1-to-0.4.2", fromVersion: "0.4.1", toVersion: "0.4.2", reversible: true, migrateConfig: false, migrateState: true },
 ] as const;
 
 function migrationPath(fromVersion: string, toVersion: string): FrameworkMigration[] | undefined {

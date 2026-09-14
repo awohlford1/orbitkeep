@@ -2,7 +2,7 @@
 
 The installer merges `hooks.template.json` into a consuming project's Claude
 settings after review. Every hook sends its JSON payload to the same framework
-command on standard input. The adapter enriches that payload with durable
+command on standard input and requests `--json` output explicitly. The adapter enriches that payload with durable
 framework actor and assignment references before normalization.
 
 Only `PreToolUse` can be treated as blocking by this initial template when the installed Claude version

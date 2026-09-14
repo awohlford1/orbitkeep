@@ -47,3 +47,20 @@ Read the provider-specific status and reason in `doctor`. Confirm the provider
 CLI is installed, the repository hook or Flight Director reference is complete, and
 the configured enforcement mode is supported. Then use `repair --plan`; the
 runtime never reports unsupported enforcement as active.
+
+## WSL starts CMD.EXE or uses `C:\Windows`
+
+This means WSL resolved Windows Node or `npx.cmd` instead of the Linux runtime.
+Orbitkeep reports `WSL_WINDOWS_NODE_MISMATCH` when it can observe this mixed
+environment. In the Ubuntu shell, verify and correct command resolution:
+
+```sh
+hash -r
+export PATH="/snap/bin:$PATH"
+type -a node npm npx
+node -p '"platform=" + process.platform + " executable=" + process.execPath'
+```
+
+The platform must be `linux`, and the first command paths should be Linux paths
+such as `/snap/bin`. Reinstall repository dependencies with Linux npm if they
+were originally created through Windows npm.

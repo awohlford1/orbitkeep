@@ -36,7 +36,7 @@ test("package subpath exports expose the downstream interface baseline", () => {
 });
 
 test("package root export is generated and exposes versioned installer APIs", () => {
-  assert.equal(FRAMEWORK_VERSION, "0.4.1");
+  assert.equal(FRAMEWORK_VERSION, "0.4.2");
   assert.equal(typeof publicPlanUpgrade, "function");
 });
 

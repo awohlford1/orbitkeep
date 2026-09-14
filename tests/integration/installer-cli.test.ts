@@ -22,6 +22,7 @@ test("consumer initialization is idempotent and preserves existing files", async
   const claude = await readFile(path.join(root, ".claude", "settings.json"), "utf8");
   assert.match(claude, /existing-hook/);
   assert.match(claude, /provider claude hook/);
+  assert.match(claude, /provider claude hook --json/);
   assert.match(await readFile(path.join(root, "AGENTS.md"), "utf8"), /Keep this text[\s\S]*Orbitkeep CLI Integration/);
   assert.match(await readFile(path.join(root, "CLAUDE.md"), "utf8"), /Orbitkeep Flight Director Integration[\s\S]*must not ask the Executive/);
   const report = await doctor(root);

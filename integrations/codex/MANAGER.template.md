@@ -6,6 +6,8 @@ instructions.
 
 - Invoke the pinned `orbitkeep` command for every canonical state change.
 - Pass each command's structured input as one JSON object on standard input.
+  Invoke managed commands with `--json` so responses remain machine-readable
+  even when the provider allocates an interactive terminal.
   Never invoke `start` without `objective`, `approach`, and
   `acceptanceCriteria`.
 - Retain the `assignmentId` returned by `start`; internal framework IDs are the

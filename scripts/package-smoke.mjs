@@ -45,7 +45,7 @@ try {
   assert.equal(typeof imported.installConsumer, "function", "package root export must load");
 
   const cli = path.join(packageRoot, packageJson.bin.orbitkeep);
-  const setup = await run(process.execPath, [cli, "setup", "--project-root", consumerRoot], consumerRoot);
+  const setup = await run(process.execPath, [cli, "setup", "--json", "--project-root", consumerRoot], consumerRoot);
   const result = JSON.parse(setup.stdout);
   assert.equal(result.status, "ready", `packed CLI setup failed: ${setup.stdout}`);
   assert.equal(result.health.activation, "active");

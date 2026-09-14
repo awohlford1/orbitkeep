@@ -14,7 +14,7 @@ recoverability, and human control over consequential actions.
 
 ## Current baseline
 
-Version 0.4.1 is a local-first developer preview and CLI MVP. The following are
+Version 0.4.2 is a local-first developer preview and CLI MVP. The following are
 implemented and validated:
 
 - Local Mission, Flight Plan, Operation, Run, Mission Report, and Clearance
@@ -26,6 +26,8 @@ implemented and validated:
   reconciliation, Containment Bay, Black Box retention, and Mission Archive.
 - Transactional setup, diagnostics, repair, upgrade, migration, and rollback.
 - Direct local execution on the supported CLI path.
+- Terminal-aware human summaries with explicit JSON output for agents and
+  automation, plus WSL runtime-mismatch guidance.
 
 The current release does not provide Docker isolation, multi-Silo federation,
 a hosted control plane, Mission Control, centralized Telemetry, multi-user
@@ -129,7 +131,7 @@ boundaries.
 | Federated preview | Multiple Silos can coordinate, but deployment and availability guarantees remain limited. |
 | Platform production | Multi-user, isolated, observable, recoverable, security-reviewed operation with published support boundaries. |
 
-Orbitkeep remains a developer preview at v0.4.1. A release number alone does
+Orbitkeep remains a developer preview at v0.4.2. A release number alone does
 not advance its readiness level; the corresponding qualification evidence must
 exist.
 

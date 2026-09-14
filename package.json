@@ -1,6 +1,6 @@
 {
   "name": "orbitkeep",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "license": "MIT",
   "type": "module",
   "description": "Local-first control plane for governed, provider-neutral agent work.",

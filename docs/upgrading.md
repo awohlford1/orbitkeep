@@ -9,7 +9,7 @@ consumer repository.
 Close active workflow assignments, then run:
 
 ```sh
-npm install --save-dev orbitkeep@0.4.1
+npm install --save-dev orbitkeep@0.4.2
 npx orbitkeep upgrade --plan
 npx orbitkeep upgrade --apply
 npx orbitkeep doctor
@@ -43,5 +43,7 @@ separate step. Rollback refuses to overwrite files modified after the upgrade.
 Version 0.4.1 registers an explicit chain from 0.3.0 through 0.4.0 and a
 metadata-only state migration from 0.4.0 to 0.4.1. The latter advances the
 installation receipt while preserving canonical workflow records and event
-history. Other starting versions require a supported migration path or a
-documented manual procedure.
+history. Version 0.4.2 adds a metadata-only migration from 0.4.1 that
+transactionally updates managed instructions and provider hooks to request
+machine-readable output explicitly. Other starting versions require a
+supported migration path or a documented manual procedure.

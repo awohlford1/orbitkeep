@@ -23,6 +23,8 @@ import { acknowledgeHandover, controlStatus, handoverPackageId, interruptControl
 import type { NormalizedProviderSignal } from "../providers/claude/index.ts";
 import { captureGitWorkspaceSnapshot } from "../evidence/index.ts";
 import type { SignedExecutiveApprovalReceipt } from "../approvals/index.ts";
+import { formatCliOutput, selectOutputMode, type OutputMode } from "./presentation.ts";
+import { assertSupportedRuntimeEnvironment } from "./runtime-environment.ts";
 
 type Input = Record<string, unknown>;
 function redactOutput(value: unknown): unknown {
@@ -35,14 +37,27 @@ function redactOutput(value: unknown): unknown {
   }
   return value;
 }
-const output = (value: unknown) => process.stdout.write(`${JSON.stringify(process.argv.includes("--redact-output") ? redactOutput(value) : value, null, 2)}\n`);
+let activeCommand = "command";
+let activeOutputMode: OutputMode = "json";
+const output = (value: unknown, failed = false) => {
+  const safe = process.argv.includes("--redact-output") ? redactOutput(value) : value;
+  const rendered = formatCliOutput({ command: activeCommand, value: safe, mode: activeOutputMode, failed });
+  if (!rendered) return;
+  (rendered.stream === "stderr" ? process.stderr : process.stdout).write(rendered.text);
+};
 
 function option(name: string): string | undefined {
   const at = process.argv.indexOf(`--${name}`);
-  return at >= 0 ? process.argv[at + 1] : undefined;
+  const value = at >= 0 ? process.argv[at + 1] : undefined;
+  return value !== undefined && !value.startsWith("-") ? value : undefined;
+}
+function inlineJsonInput(): string | undefined {
+  const at = process.argv.indexOf("--json");
+  const value = at >= 0 ? process.argv[at + 1] : undefined;
+  return value?.trimStart().startsWith("{") || value?.trimStart().startsWith("[") ? value : undefined;
 }
 async function jsonInput(): Promise<Input> {
-  const inline = option("json");
+  const inline = inlineJsonInput();
   if (inline) return JSON.parse(inline) as Input;
   if (process.stdin.isTTY) return {};
   let text = "";
@@ -452,14 +467,17 @@ async function observeProvider(root: string, provider: string, input: Input) {
 }
 
 export async function runCli(): Promise<void> {
-  const root = await findConsumerRoot(option("project-root") ?? process.cwd());
-  const [command, subcommand] = process.argv.slice(2).filter((value) => !value.startsWith("--") && value !== option("json") && value !== option("project-root"));
+  activeOutputMode = selectOutputMode({ argv: process.argv.slice(2), stdinIsTTY: process.stdin.isTTY, stdoutIsTTY: process.stdout.isTTY });
+  assertSupportedRuntimeEnvironment();
+  const [command, subcommand] = process.argv.slice(2).filter((value) => !value.startsWith("--") && value !== inlineJsonInput() && value !== option("project-root"));
+  activeCommand = command ?? "help";
   if (!command || command === "help" || process.argv.includes("--help") || process.argv.includes("-h")) { output({ commands: [
-    "setup", "init", "install --status|--recover|--rollback", "repair --plan|--apply", "doctor", "validate", "capabilities", "config show", "config validate", "upgrade --check|--plan|--apply|--status|--rollback", "--redact-output",
+    "setup", "init", "install --status|--recover|--rollback", "repair --plan|--apply", "doctor", "validate", "capabilities", "config show", "config validate", "upgrade --check|--plan|--apply|--status|--rollback", "--json|--verbose|--quiet", "--redact-output",
     "cleanup --dry-run|--apply", "archive --dry-run|--apply",
     "control launch|status|acknowledge-handover",
     ...MANAGED_WORKFLOW_COMMANDS,
   ] }); return; }
+  const root = await findConsumerRoot(option("project-root") ?? process.cwd());
   if (command === "setup") {
     const installation = await installConsumer(root);
     const health = await doctor(root);
@@ -518,5 +536,5 @@ function isCliEntryPoint(): boolean {
 }
 
 if (isCliEntryPoint()) {
-  runCli().catch((error) => { output({ status: "failed", code: (error as { code?: string }).code ?? "CLI_ERROR", message: error instanceof Error ? error.message : String(error), ...(error instanceof AssignmentSelectionError ? { candidates: error.candidates } : {}) }); process.exitCode = 1; });
+  runCli().catch((error) => { output({ status: "failed", code: (error as { code?: string }).code ?? "CLI_ERROR", message: error instanceof Error ? error.message : String(error), ...(error instanceof AssignmentSelectionError ? { candidates: error.candidates } : {}) }, true); process.exitCode = 1; });
 }

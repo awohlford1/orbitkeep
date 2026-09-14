@@ -15,7 +15,7 @@ repository's ignored `.agent-state/` directory.
 
 ## Product status
 
-Orbitkeep v0.4.1 is a local-first developer preview and CLI MVP. Its local
+Orbitkeep v0.4.2 is a local-first developer preview and CLI MVP. Its local
 Mission governance, Claude and Codex dispatch, Flight Plans, Clearances,
 Command Authority, Flight Recorder, installation repair, upgrades, retention,
 and archival are implemented and validated. Multi-Silo federation, container
@@ -34,6 +34,17 @@ The package requires Node.js 24.x.
 npm install --save-dev orbitkeep
 npx orbitkeep setup
 ```
+
+Interactive terminals receive a concise human summary. Automation, agent
+managers, and hooks should request the complete stable JSON response explicitly:
+
+```sh
+npx orbitkeep setup --json
+```
+
+Use `--verbose` for a detailed human report or `--quiet` to suppress successful
+output. When input or output is piped, Orbitkeep defaults to JSON for backwards
+compatibility. The legacy `--json '{...}'` inline-input form remains supported.
 
 `setup` performs transactional initialization and immediately runs the health
 check. A `ready` result means the required files and configured provider
@@ -91,8 +102,8 @@ second approval flag. Library callers must still pass
 The plan classifies files as `create`, `replace-managed`, `reconcile-shared`,
 `migrate-config`, `migrate-state`, `preserve`, `manual-conflict`, or `retire`.
 Only explicit one-way migrations registered by the target release may run;
-v0.4.1 registers the chain from 0.3.0 through 0.4.0 and its metadata-only state
-migration for the branding compatibility step. Canonical workflow records and
+v0.4.2 registers the chain from 0.3.0 through 0.4.1, including metadata-only
+state migrations for the branding and CLI UX compatibility steps. Canonical workflow records and
 event history are not renamed. Other source versions stop for a manual
 migration decision rather than applying an inferred transformation.
 Upgrade is blocked while an assignment or execution remains active, when a
@@ -108,7 +119,7 @@ For local development before publication:
 
 ```sh
 npm pack
-npm install --save-dev /absolute/path/to/orbitkeep-0.4.1.tgz
+npm install --save-dev /absolute/path/to/orbitkeep-0.4.2.tgz
 npx orbitkeep init
 ```
 
@@ -165,6 +176,9 @@ to control a provider action without observable confirmation.
 
 - **v0.4.1 — Orbitkeep identity:** product terminology, Crew display names,
   stable compatibility aliases, and release verification.
+- **v0.4.2 — First-install UX:** terminal-aware human summaries, explicit
+  machine-readable output, automation-safe integrations, and actionable WSL
+  runtime mismatch diagnostics.
 - **v0.5 — Silo and workflow foundations:** durable Silo identity and health,
   deterministic dependency scheduling, quality gates, budgets, reusable
   workflows, Charter evaluation, Relay contracts and an in-memory reference
@@ -194,7 +208,7 @@ broad tool and shell permissions.
 ## Compatibility
 
 Orbitkeep retains the legacy `agent-workflow` executable alias and the existing
-`.agent-workflow/` and `.agent-state/` directories in v0.4.1. Persisted schema
+`.agent-workflow/` and `.agent-state/` directories in v0.4.2. Persisted schema
 identifiers, record formats, and runtime actor identifiers also remain stable.
 New documentation and installations use the `orbitkeep` command. The alias is
 provided to make upgrades non-breaking and may be removed only in a future

@@ -80,7 +80,8 @@ async function writeIfMissing(filename: string, content: string, created: string
 }
 
 export const PINNED_AGENT_WORKFLOW_COMMAND = "npx --no-install orbitkeep";
-const CLAUDE_HOOK_COMMAND = `${PINNED_AGENT_WORKFLOW_COMMAND} provider claude hook`;
+const CLAUDE_HOOK_COMMAND = `${PINNED_AGENT_WORKFLOW_COMMAND} provider claude hook --json`;
+const INTERIM_PINNED_HOOK_COMMAND = `${PINNED_AGENT_WORKFLOW_COMMAND} provider claude hook`;
 const LEGACY_PINNED_HOOK_COMMAND = "npx --no-install agent-workflow provider claude hook";
 const LEGACY_SOURCE_HOOK_COMMAND = "node packages/agent-workflow/src/cli/index.ts provider claude hook";
 const CODEX_MARKER = "## Orbitkeep CLI Integration";
@@ -92,12 +93,12 @@ const CODEX_BLOCK_START = "<!-- agent-workflow:codex-manager:start -->";
 const CODEX_BLOCK_END = "<!-- agent-workflow:codex-manager:end -->";
 const CLAUDE_BLOCK_START = "<!-- agent-workflow:claude-manager:start -->";
 const CLAUDE_BLOCK_END = "<!-- agent-workflow:claude-manager:end -->";
-const CODEX_REFERENCE = `${CODEX_BLOCK_START}\n${CODEX_MARKER}\n\nFollow the provider-neutral manager instructions in \`.agent-workflow/codex-manager.md\`. Use the pinned Orbitkeep CLI for canonical state changes and treat provider process identifiers as provenance only.\n${CODEX_BLOCK_END}\n`;
-const CLAUDE_REFERENCE = `${CLAUDE_BLOCK_START}\n${CLAUDE_MARKER}\n\nFollow the provider-neutral Flight Director instructions in \`.agent-workflow/codex-manager.md\`. The Flight Director owns framework IDs and must not ask the Executive to provide them.\n${CLAUDE_BLOCK_END}\n`;
+const CODEX_REFERENCE = `${CODEX_BLOCK_START}\n${CODEX_MARKER}\n\nFollow the provider-neutral manager instructions in \`.agent-workflow/codex-manager.md\`. Use the pinned Orbitkeep CLI with \`--json\` for canonical state changes and treat provider process identifiers as provenance only.\n${CODEX_BLOCK_END}\n`;
+const CLAUDE_REFERENCE = `${CLAUDE_BLOCK_START}\n${CLAUDE_MARKER}\n\nFollow the provider-neutral Flight Director instructions in \`.agent-workflow/codex-manager.md\`. Use \`--json\` for machine-readable CLI responses. The Flight Director owns framework IDs and must not ask the Executive to provide them.\n${CLAUDE_BLOCK_END}\n`;
 
 async function claudeHookTemplate(packageRoot: string): Promise<{ hooks: Record<string, unknown> }> {
   const template = await readFile(path.join(packageRoot, "integrations", "claude", "hooks.template.json"), "utf8");
-  return JSON.parse(template.replaceAll("{{agentWorkflowCommand}} provider claude hook", CLAUDE_HOOK_COMMAND)) as { hooks: Record<string, unknown> };
+  return JSON.parse(template.replaceAll("{{agentWorkflowCommand}} provider claude hook --json", CLAUDE_HOOK_COMMAND)) as { hooks: Record<string, unknown> };
 }
 
 function hasCompleteClaudeHooks(settings: unknown, desired: { hooks: Record<string, unknown> }): boolean {
@@ -121,7 +122,7 @@ function replaceManagedBlock(current: string, start: string, end: string, expect
 function replaceLegacyHookCommand(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(replaceLegacyHookCommand);
   if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, replaceLegacyHookCommand(item)]));
-  return value === LEGACY_SOURCE_HOOK_COMMAND || value === LEGACY_PINNED_HOOK_COMMAND ? CLAUDE_HOOK_COMMAND : value;
+  return value === INTERIM_PINNED_HOOK_COMMAND || value === LEGACY_SOURCE_HOOK_COMMAND || value === LEGACY_PINNED_HOOK_COMMAND ? CLAUDE_HOOK_COMMAND : value;
 }
 
 async function installClaudeHooks(filename: string, template: { hooks: Record<string, unknown> }, created: string[], preserved: string[]): Promise<void> {

@@ -5,7 +5,7 @@ Orbitkeep platform. Release boundaries are capability gates, not dates. A phase
 is complete only when its behavior, failure modes, recovery, and evidence are
 validated on supported platforms.
 
-Orbitkeep v0.4.1 is a local-first developer preview and CLI MVP. The framework
+Orbitkeep v0.4.2 is a local-first developer preview and CLI MVP. The framework
 must not be represented as a distributed, isolated, multi-user platform until
 the applicable later release gates are satisfied. The detailed product and
 delivery model is maintained in [product-plan.md](product-plan.md).
@@ -30,6 +30,27 @@ Exit criteria:
 - Both CLI names resolve to the same runtime.
 - Generated Claude and Codex roles use the new display vocabulary.
 - Package, integration, migration, and compatibility tests pass.
+
+## v0.4.2 — First-install UX
+
+Scope:
+
+- Present concise summaries in interactive terminals.
+- Preserve stable structured results behind explicit `--json` output.
+- Provide `--verbose` and `--quiet` output modes.
+- Make agent managers and provider hooks request JSON explicitly.
+- Detect Windows Node or npm accidentally launched from WSL and return an
+  actionable `WSL_WINDOWS_NODE_MISMATCH` error.
+- Preserve piped-output behavior and the legacy inline `--json '{...}'` input.
+
+Exit criteria:
+
+- Interactive setup does not emit the complete installation object by default.
+- Agent, hook, piped, and package smoke paths continue to receive valid JSON.
+- Output modes are mutually exclusive and failures remain visible in quiet mode.
+- Windows, native Linux, and WSL runtime-selection tests pass.
+- v0.4.1 installations upgrade transactionally without rewriting canonical
+  workflow history.
 
 ## v0.5 — Silo and workflow foundations
 
