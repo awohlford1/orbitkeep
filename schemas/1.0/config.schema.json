@@ -146,6 +146,7 @@
       "required": [
         "rawResponsesDays",
         "closedAssignmentsDays",
+        "installationBackupsDays",
         "permanentArchiveDeletion"
       ],
       "properties": {
@@ -156,6 +157,10 @@
         "closedAssignmentsDays": {
           "type": "integer",
           "minimum": 0
+        },
+        "installationBackupsDays": {
+          "type": "integer",
+          "minimum": 1
         },
         "permanentArchiveDeletion": {
           "const": false

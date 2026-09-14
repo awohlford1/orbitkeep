@@ -9,7 +9,7 @@ import { applyRawResponseCleanup, planRawResponseCleanup } from "../cleanup/inde
 import { AssignmentSelectionError, resolveAssignmentReference, WorkflowCommandService, StateWorkflowRepository, runConsequentialOperation } from "../commands/index.ts";
 import { loadEffectiveConfiguration } from "../config/index.ts";
 import { MANAGED_WORKFLOW_COMMANDS, type ActorRef } from "../contracts/index.ts";
-import { applyRepair, installConsumer, findConsumerRoot, planRepair } from "../installer/index.ts";
+import { applyRepair, applyUpgrade, installConsumer, findConsumerRoot, installationStateDirectory, listInstallationTransactions, planInstallationTransactionCleanup, planRepair, planUpgrade, pruneInstallationTransactions, recoverInterruptedTransactions, rollbackInstallationTransaction, rollbackUpgrade, upgradeStatus } from "../installer/index.ts";
 import { appendEvent } from "../events/index.ts";
 import { coreSchemaRegistry } from "../registries/index.ts";
 import { initializeStateRoot, writeJsonAtomic } from "../storage/index.ts";
@@ -303,8 +303,11 @@ async function cleanupCommand(root: string, mode: "dry-run" | "apply") {
   const { stateRoot } = await initializeStateRoot(root, effective.config.state.directory);
   const operationId = `cleanup-${randomUUID()}`;
   const plan = await planRawResponseCleanup({ stateRoot, operationId, mode, retentionDays: effective.config.retention.rawResponsesDays });
-  if (mode === "dry-run") return plan;
-  return durableMaintenance(stateRoot, operationId, () => applyRawResponseCleanup(stateRoot, plan), effective.config.intentLogging.retryCount, effective.config.intentLogging.backoffSeconds);
+  const installationTransactions = await planInstallationTransactionCleanup(root, effective.config.state.directory, effective.config.retention.installationBackupsDays);
+  if (mode === "dry-run") return { ...plan, installation_transactions: installationTransactions };
+  const rawResponses = await durableMaintenance(stateRoot, operationId, () => applyRawResponseCleanup(stateRoot, plan), effective.config.intentLogging.retryCount, effective.config.intentLogging.backoffSeconds);
+  const installationTransactionsRemoved = await pruneInstallationTransactions(root, effective.config.state.directory, effective.config.retention.installationBackupsDays);
+  return { ...rawResponses, installationTransactionsRemoved };
 }
 
 async function controlCommand(root: string, subcommand: string | undefined, input: Input) {
@@ -452,12 +455,23 @@ export async function runCli(): Promise<void> {
   const root = await findConsumerRoot(option("project-root") ?? process.cwd());
   const [command, subcommand] = process.argv.slice(2).filter((value) => !value.startsWith("--") && value !== option("json") && value !== option("project-root"));
   if (!command || command === "help" || process.argv.includes("--help") || process.argv.includes("-h")) { output({ commands: [
-    "init", "repair --plan|--apply", "doctor", "validate", "capabilities", "config show", "config validate", "upgrade --check", "--redact-output",
+    "init", "install --status|--recover|--rollback", "repair --plan|--apply", "doctor", "validate", "capabilities", "config show", "config validate", "upgrade --check|--plan|--apply|--status|--rollback", "--redact-output",
     "cleanup --dry-run|--apply", "archive --dry-run|--apply",
     "control launch|status|acknowledge-handover",
     ...MANAGED_WORKFLOW_COMMANDS,
   ] }); return; }
   if (command === "init") { output(await installConsumer(root)); return; }
+  if (command === "install") {
+    const stateDirectory = await installationStateDirectory(root); const input = await jsonInput();
+    if (process.argv.includes("--status")) { output({ transactions: await listInstallationTransactions(root, stateDirectory) }); return; }
+    if (process.argv.includes("--recover")) { output({ recovered: await recoverInterruptedTransactions(root, stateDirectory) }); return; }
+    if (process.argv.includes("--rollback")) {
+      const transactions = await listInstallationTransactions(root, stateDirectory); const requested = typeof input.transactionId === "string" ? input.transactionId : undefined;
+      const selected = requested ? transactions.find((item) => item.transactionId === requested) : [...transactions].reverse().find((item) => item.kind === "install" && item.status === "committed");
+      if (!selected || selected.kind !== "install") throw new Error("INSTALL_TRANSACTION_NOT_FOUND"); output(await rollbackInstallationTransaction(root, stateDirectory, selected.transactionId)); return;
+    }
+    output(await installConsumer(root)); return;
+  }
   if (command === "repair") { output(process.argv.includes("--apply") ? await applyRepair(root) : await planRepair(root)); return; }
   if (command === "doctor") { output(await doctor(root)); return; }
   if (command === "validate") { output(await validateInstallation(root)); return; }
@@ -468,6 +482,10 @@ export async function runCli(): Promise<void> {
   }
   if (command === "upgrade") {
     const input = await jsonInput();
+    if (process.argv.includes("--plan")) { output(await planUpgrade(root, typeof input.targetVersion === "string" ? input.targetVersion : FRAMEWORK_VERSION)); return; }
+    if (process.argv.includes("--apply")) { output(await applyUpgrade(root, { targetVersion: typeof input.targetVersion === "string" ? input.targetVersion : FRAMEWORK_VERSION, authorizeStateMigration: process.argv.includes("--authorize-state-migration") || input.authorizeStateMigration === true })); return; }
+    if (process.argv.includes("--status")) { output(await upgradeStatus(root)); return; }
+    if (process.argv.includes("--rollback")) { output(await rollbackUpgrade(root, typeof input.transactionId === "string" ? input.transactionId : undefined)); return; }
     output(checkUpgradeCompatibility({
       currentVersion: FRAMEWORK_VERSION,
       targetVersion: typeof input.targetVersion === "string" ? input.targetVersion : FRAMEWORK_VERSION,

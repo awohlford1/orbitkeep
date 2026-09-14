@@ -13,6 +13,7 @@ export const STATE_DIRECTORIES = [
   "events", "pending", "awaiting-validation", "quarantine", "raw-responses",
   "validations", "locks/operations", "locks/ownership", "ledger", "archive",
   "cleanup", "legacy", ".runtime/event-receipts",
+  "installation-transactions", "migrations",
   "control/processes", "control/receipts", "control/outputs",
 ] as const;
 

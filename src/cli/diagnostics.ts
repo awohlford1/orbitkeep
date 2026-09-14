@@ -2,15 +2,15 @@ import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEffectiveConfiguration } from "../config/index.ts";
-import { PINNED_AGENT_WORKFLOW_COMMAND, planRepair } from "../installer/index.ts";
+import { installationStateDirectory, listInstallationTransactions, PINNED_AGENT_WORKFLOW_COMMAND, planRepair } from "../installer/index.ts";
 import { CLAUDE_HOOK_EVENTS, ClaudeProviderAdapter } from "../providers/claude/index.ts";
 import { CodexProviderAdapter } from "../providers/codex/index.ts";
 import { coreSchemaRegistry } from "../registries/index.ts";
 import { resolveStatePaths } from "../storage/index.ts";
 import { generateRoles, loadRoleCatalogue } from "../roles/generate.ts";
+import { FRAMEWORK_VERSION, SUPPORTED_SCHEMA_VERSION } from "../version.ts";
 
-export const FRAMEWORK_VERSION = "0.3.0";
-export const SUPPORTED_SCHEMA_VERSION = "1.0";
+export { FRAMEWORK_VERSION, SUPPORTED_SCHEMA_VERSION } from "../version.ts";
 
 async function exists(filename: string): Promise<boolean> { try { await access(filename); return true; } catch { return false; } }
 async function count(directory: string): Promise<number> { try { return (await readdir(directory)).length; } catch { return 0; } }
@@ -157,6 +157,11 @@ export async function doctor(projectRoot: string) {
   const providerStatuses = Object.fromEntries(Object.entries(effective?.config.providers ?? {}).sort(([left], [right]) => left.localeCompare(right)).map(([provider, policy]) => [provider, assessProviderActivation(provider, policy.enabled, policy.requiredMode, { claude: claudeIntegrated, codex: codexIntegrated }, claudeHooks)]));
   const providerFailures = Object.values(providerStatuses).filter((item) => item.status === "repair_required" || item.status === "unsupported");
   const managedRepair = await planRepair(projectRoot);
+  let installationTransactions: Awaited<ReturnType<typeof listInstallationTransactions>> = [];
+  try { installationTransactions = await listInstallationTransactions(projectRoot, await installationStateDirectory(projectRoot)); }
+  catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
+  const interruptedTransactions = installationTransactions.filter((item) => ["prepared", "applying", "rolling_back", "failed"].includes(item.status));
+  if (interruptedTransactions.length) errors.push(`Interrupted installation transactions require recovery: ${interruptedTransactions.map((item) => item.transactionId).join(", ")}.`);
   const activation = errors.length > 0 ? "blocked" : managedRepair.actions.length > 0 || providerFailures.some((item) => item.status === "repair_required") ? "repair_required" : providerFailures.length > 0 ? "blocked" : Object.values(providerStatuses).some((item) => item.status === "active") ? "active" : "active_limited";
   const capabilities = await capabilityReport({ claudeBlockingHook: claudeHooks.valid, claudeWorkflowAuthorizationConnected: claudeHooks.valid });
   return {
@@ -169,7 +174,7 @@ export async function doctor(projectRoot: string) {
     schemas: { registryComplete, recordTypes: coreSchemaRegistry.recordTypes().length, eventTypes: coreSchemaRegistry.eventTypes().length, extensions: Object.keys(effective?.extensions ?? {}) },
     counts: { pending: await count(path.join(stateRoot, "pending")), quarantine: await count(path.join(stateRoot, "quarantine")), awaitingValidation: await count(path.join(stateRoot, "awaiting-validation")) },
     stale: { operationLocks: await staleJsonCount(path.join(stateRoot, "locks", "operations")), ownershipLeases: await staleJsonCount(path.join(stateRoot, "locks", "ownership")) },
-    maintenance: { cleanupOperations: await count(path.join(stateRoot, "cleanup", ".operations")), archiveOperations: await count(path.join(stateRoot, "archive", ".operations")) },
+    maintenance: { cleanupOperations: await count(path.join(stateRoot, "cleanup", ".operations")), archiveOperations: await count(path.join(stateRoot, "archive", ".operations")), installationTransactions: installationTransactions.length, interruptedInstallationTransactions: interruptedTransactions.length },
     legacyDetected, errors, warnings, info,
   };
 }

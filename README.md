@@ -33,17 +33,55 @@ npx agent-workflow repair --plan
 npx agent-workflow repair --apply
 ```
 
-Repair restores only package-managed files recorded in the installation
-manifest and reconciles recognized Manager/hook integration points. Existing
-files are backed up under the ignored `.agent-state/installation-backups/`
-directory before replacement. Malformed user-owned JSON is reported for manual
+Install and repair operations are transactional. Before changing a file, the
+runtime writes a journal and snapshot under the ignored
+`.agent-state/installation-transactions/` directory. A failed validation rolls
+the complete operation back. Malformed user-owned JSON is reported for manual
 correction and is never overwritten automatically.
+
+Inspect or recover installation transactions with:
+
+```sh
+npx agent-workflow install --status
+npx agent-workflow install --recover
+npx agent-workflow install --rollback
+```
+
+Rollback refuses to overwrite a file that changed after the transaction
+committed. Completed transaction snapshots become cleanup-eligible after
+`retention.installationBackupsDays` (30 days by default).
+
+## Upgrade and migration
+
+Upgrade only with the target package version already installed. Review the
+versioned plan, then explicitly authorize any mutable-state migration:
+
+```sh
+npx agent-workflow upgrade --plan
+npx agent-workflow upgrade --apply --authorize-state-migration
+npx agent-workflow upgrade --status
+npx agent-workflow upgrade --rollback
+```
+
+The plan classifies files as `create`, `replace-managed`, `reconcile-shared`,
+`migrate-config`, `migrate-state`, `preserve`, `manual-conflict`, or `retire`.
+Only explicit one-way migrations registered by the target release may run; the
+0.4.0 release registers migration from 0.3.0. Other source versions stop for a
+manual migration decision rather than applying an inferred transformation.
+Upgrade is blocked while an assignment or execution remains active, when a
+retired managed file contains user changes, or when a downgrade is requested.
+Migrations may update mutable aggregate or runtime records, but never rewrite
+historical daily event logs. Completion and rollback are appended as new audit
+events, and each successful migration has a durable evidence record. After an
+upgrade rollback, reinstall the prior package version before resuming managed
+work; rollback restores repository integration state, not the npm package
+selected by the consuming project.
 
 For local development before publication:
 
 ```sh
 npm pack
-npm install --save-dev /absolute/path/to/agent-workflow-0.2.0.tgz
+npm install --save-dev /absolute/path/to/agent-workflow-0.4.0.tgz
 npx agent-workflow init
 ```
 

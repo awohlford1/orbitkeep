@@ -8,6 +8,7 @@ import {
   OPERATION_OUTCOMES,
 } from "@agent-workflow/cli/contracts";
 import { configurationDigest as publicConfigurationDigest } from "@agent-workflow/cli/config";
+import { FRAMEWORK_VERSION, planUpgrade as publicPlanUpgrade } from "@agent-workflow/cli";
 import { AgentWorkflowError } from "../../src/contracts/errors.ts";
 import {
   loadEffectiveConfiguration,
@@ -32,6 +33,11 @@ test("package subpath exports expose the downstream interface baseline", () => {
   assert.ok(ACTOR_TYPES.includes("manager"));
   assert.ok(OPERATION_OUTCOMES.includes("prevented"));
   assert.match(publicConfigurationDigest({ stable: true }), /^sha256:[a-f0-9]{64}$/);
+});
+
+test("package root export is generated and exposes versioned installer APIs", () => {
+  assert.equal(FRAMEWORK_VERSION, "0.4.0");
+  assert.equal(typeof publicPlanUpgrade, "function");
 });
 
 test("ratified defaults load without consumer configuration", async () => {

@@ -1,6 +1,6 @@
 {
   "name": "@agent-workflow/cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "MIT",
   "type": "module",
   "description": "Provider-neutral, auditable workflow runtime for Claude Code and Codex CLI managers.",

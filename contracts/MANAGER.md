@@ -12,6 +12,8 @@ Every managed interaction and consequential action must produce the applicable c
 
 The Manager may make nonmaterial implementation adjustments within configured delegated paths. Material changes require a new plan revision and Executive approval. It must not infer expanded permissions, approval, deployment authority, or permission to expose secrets.
 
+Do not run a framework upgrade while any assignment or execution is active. Review `upgrade --plan` before application. A mutable-state migration requires explicit Executive authorization, even when every file action is otherwise safe. Never request a downgrade as an implicit rollback: use the recorded transaction rollback path, which must stop if a post-commit file conflict is detected. Historical event ledgers are append-only across migration and rollback.
+
 ## Signed Executive approvals
 
 For a strong approval boundary, configure `security.executiveApproval.mode` as `signed_ed25519` and map each trusted `keyId` to a base64-encoded DER SPKI Ed25519 public key. Keep private keys and the signing operation outside every agent-accessible repository, process, and tool.

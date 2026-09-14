@@ -13,6 +13,7 @@
   "retention": {
     "rawResponsesDays": 7,
     "closedAssignmentsDays": 30,
+    "installationBackupsDays": 30,
     "permanentArchiveDeletion": false
   },
   "execution": {

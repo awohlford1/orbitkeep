@@ -36,6 +36,7 @@ export const SETTING_AUTHORITIES: readonly SettingAuthority[] = [
   projectAndAssignment("heartbeat.intervalSeconds"),
   projectOnly("retention.rawResponsesDays"),
   projectOnly("retention.closedAssignmentsDays"),
+  projectOnly("retention.installationBackupsDays"),
   {
     path: "retention.permanentArchiveDeletion",
     projectOverridable: false,

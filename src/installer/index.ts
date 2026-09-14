@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 import { initializeStateRoot, writeJsonAtomic } from "../storage/index.ts";
 import { loadEffectiveConfiguration } from "../config/index.ts";
 import { loadRoleCatalogue, renderClaude, renderCodex } from "../roles/generate.ts";
+import { FRAMEWORK_VERSION } from "../version.ts";
+import { recoverInterruptedTransactions, runInstallationTransaction } from "./transactions.ts";
+export * from "./transactions.ts";
 
 export interface InstallResult {
   projectRoot: string;
@@ -22,7 +25,7 @@ async function exists(filename: string): Promise<boolean> {
 }
 const digest = (content: string) => `sha256:${createHash("sha256").update(content).digest("hex")}`;
 
-async function expectedManagedFiles(packageRoot: string): Promise<Record<string, string>> {
+export async function expectedManagedFiles(packageRoot = fileURLToPath(new URL("../../", import.meta.url))): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
   files[".agent-workflow/codex-manager.md"] = await readFile(path.join(packageRoot, "integrations", "codex", "MANAGER.template.md"), "utf8");
   for (const contract of ["README.md", "MANAGER.md", "CONTRACTS.md", "ROLES.md"]) files[`.agent-workflow/contracts/${contract}`] = await readFile(path.join(packageRoot, "contracts", contract), "utf8");
@@ -31,6 +34,19 @@ async function expectedManagedFiles(packageRoot: string): Promise<Record<string,
     files[`.codex/agents/${role.id}.toml`] = renderCodex(role);
   }
   return files;
+}
+
+export async function installationStateDirectory(projectRoot: string): Promise<string> {
+  const content = await readFile(path.join(projectRoot, ".agent-workflow", "config.json"), "utf8").catch(() => undefined);
+  if (content === undefined) return ".agent-state";
+  try { const value = JSON.parse(content) as { state?: { directory?: unknown } }; return typeof value.state?.directory === "string" ? value.state.directory : ".agent-state"; }
+  catch { return ".agent-state"; }
+}
+
+export async function installationTargets(projectRoot: string, stateDirectory?: string): Promise<string[]> {
+  stateDirectory ??= await installationStateDirectory(projectRoot);
+  const managed = Object.keys(await expectedManagedFiles());
+  return [...managed, ".agent-workflow/config.json", ".agent-workflow/install-manifest.json", ".claude/settings.json", "AGENTS.md", "CLAUDE.md", ".gitignore", `${stateDirectory.replace(/[\\/]+$/, "")}/.runtime/installation.json`];
 }
 
 export async function preflightInstall(projectRoot: string): Promise<InstallPreflight> {
@@ -148,7 +164,7 @@ async function installClaudeReference(filename: string, created: string[], prese
   created.push(`${filename}#agent-workflow-reference`);
 }
 
-export async function installConsumer(projectRoot: string): Promise<InstallResult> {
+export async function performInstallConsumer(projectRoot: string): Promise<InstallResult> {
   const root = path.resolve(projectRoot);
   const preflight = await preflightInstall(root);
   if (preflight.status !== "ready") throw new Error(`INSTALL_REPAIR_REQUIRED: ${preflight.issues.map((issue) => `${issue.path}: ${issue.reason}`).join("; ")}`);
@@ -186,10 +202,21 @@ export async function installConsumer(projectRoot: string): Promise<InstallResul
   await writeFile(path.join(root, ".agent-workflow", "install-manifest.json"), `${JSON.stringify({ schemaVersion: "1.0", managed: manifest }, null, 2)}\n`, "utf8");
   const receiptRelative = path.join(".runtime", "installation.json");
   const receipt = await writeJsonAtomic(state.stateRoot, receiptRelative, {
-    schema_version: "1.0", framework_version: "0.3.0", installed_at: new Date().toISOString(),
+    schema_version: "1.0", framework_version: FRAMEWORK_VERSION, installed_at: new Date().toISOString(),
     project_root: root, legacy_detected: legacyDetected, created: created.map((item) => path.relative(root, item)),
   });
   return { projectRoot: root, created, preserved, legacyDetected, receipt };
+}
+
+export async function installConsumer(projectRoot: string): Promise<InstallResult & { transactionId: string }> {
+  const root = path.resolve(projectRoot); const stateDirectory = await installationStateDirectory(root);
+  await recoverInterruptedTransactions(root, stateDirectory);
+  const transaction = await runInstallationTransaction({
+    projectRoot: root, stateDirectory, kind: "install", targets: await installationTargets(root, stateDirectory), toVersion: FRAMEWORK_VERSION,
+    apply: () => performInstallConsumer(root),
+    validate: async () => { const repair = await planRepair(root); if (!repair.safe || repair.actions.length) throw new Error(`INSTALL_VALIDATION_FAILED: ${repair.actions.map((item) => item.path).join(", ")}`); },
+  });
+  return { ...transaction.result, transactionId: transaction.transaction.transactionId };
 }
 
 export async function planRepair(projectRoot: string): Promise<RepairPlan> {
@@ -222,14 +249,11 @@ export async function planRepair(projectRoot: string): Promise<RepairPlan> {
   return { projectRoot: root, safe: !actions.some((action) => action.action === "manual"), actions };
 }
 
-export async function applyRepair(projectRoot: string): Promise<RepairPlan> {
-  const plan = await planRepair(projectRoot); if (!plan.safe) return plan;
-  const effective = await loadEffectiveConfiguration({ projectRoot: plan.projectRoot, requireProjectConfig: true });
-  const state = await initializeStateRoot(plan.projectRoot, effective.config.state.directory);
-  const backupDirectory = path.join(state.stateRoot, "installation-backups", new Date().toISOString().replace(/[:.]/g, "-")); const packageRoot = fileURLToPath(new URL("../../", import.meta.url)); const expected = await expectedManagedFiles(packageRoot);
+export async function performRepairPlan(plan: RepairPlan): Promise<RepairPlan> {
+  if (!plan.safe) return plan;
+  const packageRoot = fileURLToPath(new URL("../../", import.meta.url)); const expected = await expectedManagedFiles(packageRoot);
   for (const action of plan.actions) {
     const target = path.join(plan.projectRoot, action.path); const current = await readFile(target, "utf8").catch(() => undefined);
-    if (current !== undefined) { const backup = path.join(backupDirectory, action.path); await mkdir(path.dirname(backup), { recursive: true }); await writeFile(backup, current, "utf8"); }
     if (action.action === "restore") { await mkdir(path.dirname(target), { recursive: true }); await writeFile(target, expected[action.path]!, "utf8"); }
     if (action.action === "reconcile" && current !== undefined && action.path === "AGENTS.md") {
       const reconciled = replaceManagedBlock(current, CODEX_BLOCK_START, CODEX_BLOCK_END, CODEX_REFERENCE); if (reconciled !== undefined) await writeFile(target, reconciled, "utf8");
@@ -238,5 +262,20 @@ export async function applyRepair(projectRoot: string): Promise<RepairPlan> {
       const reconciled = replaceManagedBlock(current, CLAUDE_BLOCK_START, CLAUDE_BLOCK_END, CLAUDE_REFERENCE); if (reconciled !== undefined) await writeFile(target, reconciled, "utf8");
     }
   }
-  await installConsumer(plan.projectRoot); return { ...plan, backupDirectory };
+  await performInstallConsumer(plan.projectRoot); return plan;
 }
+
+export async function applyRepair(projectRoot: string): Promise<RepairPlan & { transactionId?: string }> {
+  const stateDirectory = await installationStateDirectory(projectRoot); await recoverInterruptedTransactions(projectRoot, stateDirectory);
+  const plan = await planRepair(projectRoot); if (!plan.safe || plan.actions.length === 0) return plan;
+  const targets = [...plan.actions.filter((action) => action.action !== "manual").map((action) => action.path), ".agent-workflow/install-manifest.json", `${stateDirectory.replace(/[\\/]+$/, "")}/.runtime/installation.json`];
+  const transaction = await runInstallationTransaction({
+    projectRoot: plan.projectRoot, stateDirectory, kind: "repair", targets,
+    apply: () => performRepairPlan(plan),
+    validate: async () => { const after = await planRepair(plan.projectRoot); if (!after.safe || after.actions.length) throw new Error(`REPAIR_VALIDATION_FAILED: ${after.actions.map((item) => item.path).join(", ")}`); },
+  });
+  const backupDirectory = path.join(plan.projectRoot, stateDirectory, "installation-transactions", transaction.transaction.transactionId, "backup");
+  return { ...transaction.result, backupDirectory, transactionId: transaction.transaction.transactionId };
+}
+
+export * from "./upgrade.ts";

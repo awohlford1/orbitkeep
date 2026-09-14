@@ -19,6 +19,7 @@ export interface FrameworkConfiguration {
   retention: {
     rawResponsesDays: number;
     closedAssignmentsDays: number;
+    installationBackupsDays: number;
     permanentArchiveDeletion: false;
   };
   execution: {

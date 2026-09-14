@@ -21,6 +21,7 @@ const SHAPE = {
   retention: {
     rawResponsesDays: true,
     closedAssignmentsDays: true,
+    installationBackupsDays: true,
     permanentArchiveDeletion: true,
   },
   execution: { defaultInterruptionMode: true, automaticForceEscalation: true },
@@ -156,6 +157,7 @@ export function validateConfigurationLayer(input: unknown, source = "configurati
   if (heartbeat?.intervalSeconds !== undefined) assertInteger(heartbeat.intervalSeconds, `${source}.heartbeat.intervalSeconds`, 1);
   if (retention?.rawResponsesDays !== undefined) assertInteger(retention.rawResponsesDays, `${source}.retention.rawResponsesDays`);
   if (retention?.closedAssignmentsDays !== undefined) assertInteger(retention.closedAssignmentsDays, `${source}.retention.closedAssignmentsDays`);
+  if (retention?.installationBackupsDays !== undefined) assertInteger(retention.installationBackupsDays, `${source}.retention.installationBackupsDays`, 1);
   if (retention?.permanentArchiveDeletion !== undefined && retention.permanentArchiveDeletion !== false) invalid("retention.permanentArchiveDeletion", source, "CONFIG_INVARIANT_VIOLATION");
   if (execution?.defaultInterruptionMode !== undefined && !["graceful", "force"].includes(execution.defaultInterruptionMode as string)) invalid("execution.defaultInterruptionMode", source);
   if (execution?.automaticForceEscalation !== undefined && execution.automaticForceEscalation !== false) invalid("execution.automaticForceEscalation", source, "CONFIG_INVARIANT_VIOLATION");

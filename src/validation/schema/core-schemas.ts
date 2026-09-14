@@ -53,7 +53,7 @@ export const recordSchemas: Record<CoreRecordType, JsonSchema> = {
     intentLogging: strict("#config-intent", ["retryCount", "backoffSeconds"], { retryCount: { type: "integer", minimum: 0 }, backoffSeconds: { type: "array", items: { type: "number", minimum: 0 } } }),
     referenceValidation: strict("#config-reference", ["retrySeconds", "timeoutSeconds"], { retrySeconds: { type: "array", items: { type: "number", minimum: 0 } }, timeoutSeconds: positiveInteger }),
     heartbeat: strict("#config-heartbeat", ["enabled", "intervalSeconds"], { enabled: { type: "boolean" }, intervalSeconds: positiveInteger }),
-    retention: strict("#config-retention", ["rawResponsesDays", "closedAssignmentsDays", "permanentArchiveDeletion"], { rawResponsesDays: { type: "integer", minimum: 0 }, closedAssignmentsDays: { type: "integer", minimum: 0 }, permanentArchiveDeletion: { const: false } }),
+    retention: strict("#config-retention", ["rawResponsesDays", "closedAssignmentsDays", "installationBackupsDays", "permanentArchiveDeletion"], { rawResponsesDays: { type: "integer", minimum: 0 }, closedAssignmentsDays: { type: "integer", minimum: 0 }, installationBackupsDays: positiveInteger, permanentArchiveDeletion: { const: false } }),
     execution: strict("#config-execution", ["defaultInterruptionMode", "automaticForceEscalation"], { defaultInterruptionMode: { enum: ["graceful", "force"] }, automaticForceEscalation: { const: false } }),
     roles: strict("#config-roles", ["enabled"], { enabled: stringArray }),
     materiality: strict("#config-materiality", ["alwaysMaterial", "delegatedChanges", "cumulativeChangeThreshold", "ambiguityBehavior"], { alwaysMaterial: stringArray, delegatedChanges: stringArray, cumulativeChangeThreshold: positiveInteger, ambiguityBehavior: { const: "hold_affected_work" } }),
@@ -131,6 +131,8 @@ function payloadFor(eventType: string): JsonSchema {
     properties.submission_id = identifier(); required = ["submission_id"];
   } else if (eventType === "runtime.operation_blocked") {
     properties.operation_id = identifier(); required = ["operation_id", "reason"];
+  } else if (eventType === "framework.migration_completed" || eventType === "framework.migration_rolled_back") {
+    properties.from_version = string(); properties.to_version = string(); properties.transaction_id = identifier("itx"); required = ["from_version", "to_version", "transaction_id"];
   } else {
     required = ["record_ref"];
   }

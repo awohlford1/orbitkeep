@@ -37,12 +37,12 @@ test("long assignment operations renew their lock and exclude contenders", async
   let entered!: () => void;
   const started = new Promise<void>((resolve) => { entered = resolve; });
   const first = withAssignmentWriteLock({
-    stateRoot, assignmentId: "asn-long", ownerId: "owner-long", leaseMs: 300, timeoutMs: 2_000,
-  }, async () => { entered(); await new Promise((resolve) => setTimeout(resolve, 900)); });
+    stateRoot, assignmentId: "asn-long", ownerId: "owner-long", leaseMs: 1_000, timeoutMs: 4_000,
+  }, async () => { entered(); await new Promise((resolve) => setTimeout(resolve, 2_400)); });
   await started;
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
   await assert.rejects(
-    withAssignmentWriteLock({ stateRoot, assignmentId: "asn-long", ownerId: "owner-contender", leaseMs: 300, timeoutMs: 100, retryMs: 5 }, async () => undefined),
+    withAssignmentWriteLock({ stateRoot, assignmentId: "asn-long", ownerId: "owner-contender", leaseMs: 1_000, timeoutMs: 200, retryMs: 10 }, async () => undefined),
     (error) => error instanceof AgentWorkflowError && error.code === "LOCK_TIMEOUT",
   );
   await first;

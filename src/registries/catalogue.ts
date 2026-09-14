@@ -23,7 +23,7 @@ export const CORE_EVENT_TYPES = [
   "approval.expired", "escalation.raised", "escalation.resolved",
   "manager.ownership_acquired", "manager.ownership_released", "record.closed",
   "archive.completed", "archive.failed", "cleanup.completed", "runtime.operation_blocked",
-  "event.corrected",
+  "event.corrected", "framework.migration_completed", "framework.migration_rolled_back",
 ] as const;
 
 export type CoreEventType = (typeof CORE_EVENT_TYPES)[number];
