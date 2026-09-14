@@ -1,6 +1,6 @@
 # Public contract baseline
 
-Import provider-neutral types from `@agent-workflow/cli/contracts`. The public
+Import provider-neutral types from `orbitkeep/contracts`. The public
 surface includes `OperationRequest`, `OperationResult`, `ActorRef`,
 `RecordRef`, `ArtifactRef`, `Clock`, `IdGenerator`, `ProviderAdapter`,
 `ProviderContext`, `CapabilityReport`, `FrameworkConfiguration`,
@@ -12,4 +12,4 @@ The constant catalogues (`ACTOR_TYPES`, `FRAMEWORK_ID_KINDS`,
 use. Provider identifiers are provenance only; framework identifiers remain
 durable.
 
-Configuration APIs are exported separately from `@agent-workflow/cli/config`.
+Configuration APIs are exported separately from `orbitkeep/config`.

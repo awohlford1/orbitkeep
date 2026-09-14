@@ -1,18 +1,19 @@
 {
-  "name": "@agent-workflow/cli",
-  "version": "0.4.0",
+  "name": "orbitkeep",
+  "version": "0.4.1",
   "license": "MIT",
   "type": "module",
-  "description": "Provider-neutral, auditable workflow runtime for Claude Code and Codex CLI managers.",
+  "description": "Mission control for governed, provider-neutral agent work.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/awohlford1/agent-workflow.git"
+    "url": "git+https://github.com/awohlford1/orbitkeep.git"
   },
   "bugs": {
-    "url": "https://github.com/awohlford1/agent-workflow/issues"
+    "url": "https://github.com/awohlford1/orbitkeep/issues"
   },
-  "homepage": "https://github.com/awohlford1/agent-workflow#readme",
+  "homepage": "https://github.com/awohlford1/orbitkeep#readme",
   "keywords": [
+    "orbitkeep",
     "agent-workflow",
     "claude-code",
     "codex",
@@ -26,10 +27,12 @@
     "integrations",
     "roles",
     "schemas",
+    "docs",
     "README.md",
     "LICENSE"
   ],
   "bin": {
+    "orbitkeep": "dist/cli/index.js",
     "agent-workflow": "dist/cli/index.js"
   },
   "exports": {

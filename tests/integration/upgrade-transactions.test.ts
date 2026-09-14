@@ -79,14 +79,34 @@ test("authorized upgrade migrates mutable state, appends evidence, and rolls bac
   const configPath = path.join(projectRoot, ".agent-workflow", "config.json"); const config = JSON.parse(await readFile(configPath, "utf8")) as { retention: Record<string, unknown> }; delete config.retention.installationBackupsDays; await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
   const eventsRoot = path.join(projectRoot, ".agent-state", "events"); const historicPath = path.join(eventsRoot, "2020-01-01.jsonl"); const historic = `${JSON.stringify({ schema_version: "1.0", event_id: "evt-historic", event_type: "decision.recorded", occurred_at: "2020-01-01T00:00:00.000Z", recorded_at: "2020-01-01T00:00:00.000Z", sequence: 1, actor: { actor_id: "manager:test", actor_type: "manager" }, recorded_by: { actor_id: "runtime-agent-workflow", actor_type: "runtime" }, data: { record_ref: { record_type: "decision", record_id: "dec-historic" } } })}\n`; await writeFile(historicPath, historic);
   const plan = await planUpgrade(projectRoot); assert.equal(plan.safe, true); assert.equal(plan.stateMigrationApprovalRequired, true); assert.ok(plan.actions.some((item) => item.kind === "migrate-config")); assert.ok(plan.actions.some((item) => item.kind === "migrate-state"));
-  assert.deepEqual(plan.migrationIds, ["migration-0.3.0-to-0.4.0"]);
+  assert.deepEqual(plan.migrationIds, ["migration-0.3.0-to-0.4.0", "migration-0.4.0-to-0.4.1"]);
   await assert.rejects(applyUpgrade(projectRoot), /STATE_MIGRATION_APPROVAL_REQUIRED/);
   const result = await applyUpgrade(projectRoot, { authorizeStateMigration: true }); assert.equal(result.status, "upgraded"); assert.equal(result.transaction?.status, "committed"); assert.ok(result.migrationEvidence);
-  assert.equal((JSON.parse(await readFile(receiptPath, "utf8")) as { framework_version: string }).framework_version, "0.4.0");
+  assert.equal((JSON.parse(await readFile(receiptPath, "utf8")) as { framework_version: string }).framework_version, "0.4.1");
   assert.equal((JSON.parse(await readFile(configPath, "utf8")) as { retention: { installationBackupsDays: number } }).retention.installationBackupsDays, 30);
   assert.equal(await readFile(historicPath, "utf8"), historic);
   const rolledBack = await rollbackUpgrade(projectRoot, result.transaction?.transactionId); assert.equal(rolledBack.status, "rolled_back");
   assert.equal((JSON.parse(await readFile(receiptPath, "utf8")) as { framework_version: string }).framework_version, "0.3.0"); assert.equal(await readFile(historicPath, "utf8"), historic);
+});
+
+test("0.4.0 branding migration advances metadata without renaming canonical workflow data", async () => {
+  const projectRoot = await root("aw-upgrade-branding-"); await installConsumer(projectRoot);
+  const receiptPath = path.join(projectRoot, ".agent-state", ".runtime", "installation.json");
+  const receipt = JSON.parse(await readFile(receiptPath, "utf8")) as Record<string, unknown>;
+  receipt.framework_version = "0.4.0";
+  await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  const canonicalPath = path.join(projectRoot, ".agent-state", "events", "2020-01-02.jsonl");
+  const canonical = `${JSON.stringify({ schema_version: "1.0", event_id: "evt-branding-history", event_type: "decision.recorded", occurred_at: "2020-01-02T00:00:00.000Z", recorded_at: "2020-01-02T00:00:00.000Z", sequence: 1, actor: { actor_id: "manager:test", actor_type: "manager" }, recorded_by: { actor_id: "runtime-agent-workflow", actor_type: "runtime" }, data: { record_ref: { record_type: "decision", record_id: "dec-branding-history" } } })}\n`;
+  await writeFile(canonicalPath, canonical);
+
+  const plan = await planUpgrade(projectRoot);
+  assert.equal(plan.safe, true);
+  assert.equal(plan.stateMigrationApprovalRequired, true);
+  assert.deepEqual(plan.migrationIds, ["migration-0.4.0-to-0.4.1"]);
+  const result = await applyUpgrade(projectRoot, { authorizeStateMigration: true });
+  assert.equal(result.status, "upgraded");
+  assert.equal((JSON.parse(await readFile(receiptPath, "utf8")) as { framework_version: string }).framework_version, "0.4.1");
+  assert.equal(await readFile(canonicalPath, "utf8"), canonical);
 });
 
 test("upgrade refuses to guess when no registered migration path exists", async () => {

@@ -79,17 +79,21 @@ async function writeIfMissing(filename: string, content: string, created: string
   created.push(filename);
 }
 
-export const PINNED_AGENT_WORKFLOW_COMMAND = "npx --no-install agent-workflow";
+export const PINNED_AGENT_WORKFLOW_COMMAND = "npx --no-install orbitkeep";
 const CLAUDE_HOOK_COMMAND = `${PINNED_AGENT_WORKFLOW_COMMAND} provider claude hook`;
+const LEGACY_PINNED_HOOK_COMMAND = "npx --no-install agent-workflow provider claude hook";
 const LEGACY_SOURCE_HOOK_COMMAND = "node packages/agent-workflow/src/cli/index.ts provider claude hook";
-const CODEX_MARKER = "## Agent Workflow CLI Integration";
-const CLAUDE_MARKER = "## Agent Workflow Manager Integration";
+const CODEX_MARKER = "## Orbitkeep CLI Integration";
+const CLAUDE_MARKER = "## Orbitkeep Flight Director Integration";
+const INTERIM_CLAUDE_MARKER = "## Orbitkeep Manager Integration";
+const LEGACY_CODEX_MARKER = "## Agent Workflow CLI Integration";
+const LEGACY_CLAUDE_MARKER = "## Agent Workflow Manager Integration";
 const CODEX_BLOCK_START = "<!-- agent-workflow:codex-manager:start -->";
 const CODEX_BLOCK_END = "<!-- agent-workflow:codex-manager:end -->";
 const CLAUDE_BLOCK_START = "<!-- agent-workflow:claude-manager:start -->";
 const CLAUDE_BLOCK_END = "<!-- agent-workflow:claude-manager:end -->";
-const CODEX_REFERENCE = `${CODEX_BLOCK_START}\n${CODEX_MARKER}\n\nFollow the provider-neutral manager instructions in \`.agent-workflow/codex-manager.md\`. Use the pinned Agent Workflow CLI for canonical state changes and treat provider process identifiers as provenance only.\n${CODEX_BLOCK_END}\n`;
-const CLAUDE_REFERENCE = `${CLAUDE_BLOCK_START}\n${CLAUDE_MARKER}\n\nFollow the provider-neutral manager instructions in \`.agent-workflow/codex-manager.md\`. The Manager owns framework IDs and must not ask the Executive to provide them.\n${CLAUDE_BLOCK_END}\n`;
+const CODEX_REFERENCE = `${CODEX_BLOCK_START}\n${CODEX_MARKER}\n\nFollow the provider-neutral manager instructions in \`.agent-workflow/codex-manager.md\`. Use the pinned Orbitkeep CLI for canonical state changes and treat provider process identifiers as provenance only.\n${CODEX_BLOCK_END}\n`;
+const CLAUDE_REFERENCE = `${CLAUDE_BLOCK_START}\n${CLAUDE_MARKER}\n\nFollow the provider-neutral Flight Director instructions in \`.agent-workflow/codex-manager.md\`. The Flight Director owns framework IDs and must not ask the Executive to provide them.\n${CLAUDE_BLOCK_END}\n`;
 
 async function claudeHookTemplate(packageRoot: string): Promise<{ hooks: Record<string, unknown> }> {
   const template = await readFile(path.join(packageRoot, "integrations", "claude", "hooks.template.json"), "utf8");
@@ -117,7 +121,7 @@ function replaceManagedBlock(current: string, start: string, end: string, expect
 function replaceLegacyHookCommand(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(replaceLegacyHookCommand);
   if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, replaceLegacyHookCommand(item)]));
-  return value === LEGACY_SOURCE_HOOK_COMMAND ? CLAUDE_HOOK_COMMAND : value;
+  return value === LEGACY_SOURCE_HOOK_COMMAND || value === LEGACY_PINNED_HOOK_COMMAND ? CLAUDE_HOOK_COMMAND : value;
 }
 
 async function installClaudeHooks(filename: string, template: { hooks: Record<string, unknown> }, created: string[], preserved: string[]): Promise<void> {
@@ -149,7 +153,7 @@ async function installCodexReference(filename: string, created: string[], preser
     if (error.code === "ENOENT") return "";
     throw error;
   });
-  if (current.includes(CODEX_MARKER)) { preserved.push(`${filename}#agent-workflow-reference`); return; }
+  if (current.includes(CODEX_MARKER) || current.includes(LEGACY_CODEX_MARKER)) { preserved.push(`${filename}#agent-workflow-reference`); return; }
   await writeFile(filename, `${current}${current === "" || current.endsWith("\n") ? "" : "\n"}\n${CODEX_REFERENCE}`, "utf8");
   created.push(`${filename}#agent-workflow-reference`);
 }
@@ -159,7 +163,7 @@ async function installClaudeReference(filename: string, created: string[], prese
     if (error.code === "ENOENT") return "";
     throw error;
   });
-  if (current.includes(CLAUDE_MARKER)) { preserved.push(`${filename}#agent-workflow-reference`); return; }
+  if (current.includes(CLAUDE_MARKER) || current.includes(INTERIM_CLAUDE_MARKER) || current.includes(LEGACY_CLAUDE_MARKER)) { preserved.push(`${filename}#agent-workflow-reference`); return; }
   await writeFile(filename, `${current}${current === "" || current.endsWith("\n") ? "" : "\n"}\n${CLAUDE_REFERENCE}`, "utf8");
   created.push(`${filename}#agent-workflow-reference`);
 }
@@ -193,7 +197,7 @@ export async function performInstallConsumer(projectRoot: string): Promise<Insta
   const state = await initializeStateRoot(root, effective.config.state.directory);
   const ignoredStateDirectory = `${path.relative(root, state.stateRoot).split(path.sep).join("/").replace(/\/+$/, "")}/`;
   if (!ignore.split(/\r?\n/).some((line) => line.trim().replace(/^\//, "") === ignoredStateDirectory)) {
-    await writeFile(ignorePath, `${ignore}${ignore.endsWith("\n") || ignore === "" ? "" : "\n"}\n# Agent Workflow local runtime state\n${ignoredStateDirectory}\n`, "utf8");
+    await writeFile(ignorePath, `${ignore}${ignore.endsWith("\n") || ignore === "" ? "" : "\n"}\n# Orbitkeep local runtime state\n${ignoredStateDirectory}\n`, "utf8");
     created.push(`${ignorePath}#agent-workflow-entry`);
   } else preserved.push(`${ignorePath}#agent-workflow-entry`);
   const legacyDetected = await exists(path.join(state.stateRoot, "manager-ledger.json")) || await exists(path.join(root, "docs", "agent-operations", "operating-contracts"));

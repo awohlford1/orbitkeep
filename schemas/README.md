@@ -1,4 +1,4 @@
-# Agent Workflow schemas
+# Orbitkeep schemas
 
 Schemas are independently versioned under `schemas/<schema-version>/`. Use
 `1.0/config.schema.json` and `1.0/event.schema.json` as editor targets. Record

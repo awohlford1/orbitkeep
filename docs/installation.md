@@ -8,11 +8,11 @@
 
 ## Standard setup
 
-From the project that will use Agent Workflow:
+From the project that will use Orbitkeep:
 
 ```sh
-npm install --save-dev @agent-workflow/cli
-npx agent-workflow setup
+npm install --save-dev orbitkeep
+npx orbitkeep setup
 ```
 
 `setup` installs the repository integration transactionally and runs `doctor`.
@@ -33,9 +33,9 @@ The result is:
 Use the read-only plan before changing a partial or drifted installation:
 
 ```sh
-npx agent-workflow repair --plan
-npx agent-workflow repair --apply
-npx agent-workflow doctor
+npx orbitkeep repair --plan
+npx orbitkeep repair --apply
+npx orbitkeep doctor
 ```
 
 Malformed user-owned JSON is never overwritten. Correct it manually and rerun
@@ -47,9 +47,9 @@ shared files.
 The same setup command works after installing from a Git URL or local tarball:
 
 ```sh
-npm install --save-dev /path/to/agent-workflow-0.4.0.tgz
-npx agent-workflow setup
+npm install --save-dev /path/to/orbitkeep-0.4.1.tgz
+npx orbitkeep setup
 ```
 
-Pin a released version in production repositories so every manager uses the
+Pin a released version in production repositories so every Flight Director uses the
 same runtime and contracts.

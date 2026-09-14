@@ -463,7 +463,7 @@ export async function runCli(): Promise<void> {
   if (command === "setup") {
     const installation = await installConsumer(root);
     const health = await doctor(root);
-    output({ status: health.activation === "active" ? "ready" : "attention_required", installation, health, nextStep: health.activation === "active" ? "Agent Workflow is ready." : "Review health.errors, then run agent-workflow repair --plan." });
+    output({ status: health.activation === "active" ? "ready" : "attention_required", installation, health, nextStep: health.activation === "active" ? "Orbitkeep is ready." : "Review health.errors, then run orbitkeep repair --plan." });
     return;
   }
   if (command === "init") { output(await installConsumer(root)); return; }

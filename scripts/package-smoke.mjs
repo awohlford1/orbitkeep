@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
-const consumerRoot = await mkdtemp(path.join(tmpdir(), "agent-workflow-package-"));
+const consumerRoot = await mkdtemp(path.join(tmpdir(), "orbitkeep-package-"));
 const npmEntryPoint = process.env.npm_execpath;
 let tarball;
 
@@ -35,12 +35,16 @@ try {
   await writeFile(path.join(consumerRoot, "package.json"), "{\"private\":true}\n");
   await runNpm(["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], consumerRoot);
 
-  const packageRoot = path.join(consumerRoot, "node_modules", "@agent-workflow", "cli");
+  const packageRoot = path.join(consumerRoot, "node_modules", "orbitkeep");
   const packageJson = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
+  assert.equal(packageJson.name, "orbitkeep");
+  assert.equal(packageJson.bin["agent-workflow"], packageJson.bin.orbitkeep, "legacy CLI alias must resolve to Orbitkeep");
+  await readFile(path.join(packageRoot, "docs", "domain-model.md"), "utf8");
+  await readFile(path.join(packageRoot, "docs", "roadmap.md"), "utf8");
   const imported = await import(pathToFileURL(path.join(packageRoot, packageJson.exports["."])).href);
   assert.equal(typeof imported.installConsumer, "function", "package root export must load");
 
-  const cli = path.join(packageRoot, packageJson.bin["agent-workflow"]);
+  const cli = path.join(packageRoot, packageJson.bin.orbitkeep);
   const setup = await run(process.execPath, [cli, "setup", "--project-root", consumerRoot], consumerRoot);
   const result = JSON.parse(setup.stdout);
   assert.equal(result.status, "ready", `packed CLI setup failed: ${setup.stdout}`);

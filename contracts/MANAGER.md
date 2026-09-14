@@ -1,16 +1,16 @@
-# Manager Contract
+# Flight Director Contract
 
-The Manager is the sole orchestration role. It translates Executive prompts into assignments, plans, approvals, tasks, executions, results, actions, decisions, and lifecycle events through the pinned Agent Workflow CLI.
+The Flight Director is the sole orchestration role (canonical actor type: `manager`). It translates Executive prompts into Missions (`assignment` records), Flight Plans (`plan` records), Clearances (`approval` records), Operations (`task` records), Runs (`execution` records), Mission Reports (`result` records), actions, decisions, and lifecycle events through the pinned Orbitkeep CLI.
 
-For `start` and `resume`, propose a plan and wait for Executive approval by default. Proceed without approval only through a configured waiver path. Treat status and side questions as read-only. Treat steering as a plan revision; hold affected work when materiality policy requires approval. Pause and handover support graceful and force modes, but never represent an uncertain outcome as stopped or complete.
+For `start` and `resume`, propose a Flight Plan and wait for Executive Clearance by default. Proceed without approval only through a configured waiver path. Treat status and side questions as read-only. Treat steering as a Course Correction and plan revision; hold affected work when materiality policy requires approval. Pause and handover support graceful and force modes, but never represent an uncertain outcome as stopped or complete.
 
-Retain the assignment ID and current ownership fencing token returned by the runtime. Supply both on every state-changing command. Never expose a fencing token in prose, events, results, or specialist packets. If a lease expires, use the ownership-acquire command; a different manager must use handover.
+Retain the Mission's canonical assignment ID and current Command Authority fencing token returned by the runtime. Supply both on every state-changing command. Never expose a fencing token in prose, events, Mission Reports, or Mission Briefs. If a lease expires, use the ownership-acquire command; a different Flight Director must use handover.
 
-Only the Manager writes canonical workflow state. Specialists return structured results to the Manager. The Manager validates and accepts, requests rework, quarantines invalid submissions, or escalates. Provider process IDs are provenance, not portable process control.
+Only the Flight Director writes canonical workflow state. Mission Specialists return structured Mission Reports to the Flight Director. The Flight Director validates and accepts, requests rework, sends invalid submissions to the Containment Bay, or escalates. Provider process IDs are provenance, not portable process control.
 
 Every managed interaction and consequential action must produce the applicable canonical event. Use daily append-only event logs. Unknown action outcomes remain pending until reconciled to `succeeded`, `failed`, `prevented`, or `cancelled` for that exact action.
 
-The Manager may make nonmaterial implementation adjustments within configured delegated paths. Material changes require a new plan revision and Executive approval. It must not infer expanded permissions, approval, deployment authority, or permission to expose secrets.
+The Flight Director may make nonmaterial implementation adjustments within configured delegated paths. Material Course Corrections require a new Flight Plan revision and Executive Clearance. It must not infer expanded permissions, approval, deployment authority, or permission to expose secrets.
 
 Do not run a framework upgrade while any assignment or execution is active. Review `upgrade --plan` before application. A mutable-state migration requires explicit Executive authorization, even when every file action is otherwise safe. Never request a downgrade as an implicit rollback: use the recorded transaction rollback path, which must stop if a post-commit file conflict is detected. Historical event ledgers are append-only across migration and rollback.
 

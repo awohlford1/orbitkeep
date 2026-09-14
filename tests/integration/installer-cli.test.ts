@@ -22,8 +22,8 @@ test("consumer initialization is idempotent and preserves existing files", async
   const claude = await readFile(path.join(root, ".claude", "settings.json"), "utf8");
   assert.match(claude, /existing-hook/);
   assert.match(claude, /provider claude hook/);
-  assert.match(await readFile(path.join(root, "AGENTS.md"), "utf8"), /Keep this text[\s\S]*Agent Workflow CLI Integration/);
-  assert.match(await readFile(path.join(root, "CLAUDE.md"), "utf8"), /Agent Workflow Manager Integration[\s\S]*must not ask the Executive/);
+  assert.match(await readFile(path.join(root, "AGENTS.md"), "utf8"), /Keep this text[\s\S]*Orbitkeep CLI Integration/);
+  assert.match(await readFile(path.join(root, "CLAUDE.md"), "utf8"), /Orbitkeep Flight Director Integration[\s\S]*must not ask the Executive/);
   const report = await doctor(root);
   assert.equal(report.healthy, true);
   assert.deepEqual(report.integrations, { claude: true, codex: true });
@@ -147,13 +147,13 @@ test("repair detects, backs up, and restores drift inside a managed instruction 
   await installConsumer(root);
   const agentsPath = path.join(root, "AGENTS.md");
   const canonical = await readFile(agentsPath, "utf8");
-  await writeFile(agentsPath, canonical.replace("Use the pinned Agent Workflow CLI", "Use an unpinned workflow CLI"));
+  await writeFile(agentsPath, canonical.replace("Use the pinned Orbitkeep CLI", "Use an unpinned workflow CLI"));
   const planned = await planRepair(root);
   assert.ok(planned.actions.some((action) => action.path === "AGENTS.md" && action.action === "reconcile"));
   const applied = await applyRepair(root);
   const repaired = await readFile(agentsPath, "utf8");
   assert.match(repaired, /# Project rules[\s\S]*Keep me/);
-  assert.match(repaired, /Use the pinned Agent Workflow CLI/);
+  assert.match(repaired, /Use the pinned Orbitkeep CLI/);
   assert.ok(applied.backupDirectory);
   assert.match(await readFile(path.join(applied.backupDirectory!, "AGENTS.md"), "utf8"), /unpinned workflow CLI/);
 });

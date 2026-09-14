@@ -173,7 +173,7 @@ export function preToolUseOutput(accepted: boolean, reason?: string): ClaudePreT
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: reason ?? "The Agent Workflow runtime rejected this managed operation.",
+      permissionDecisionReason: reason ?? "The Orbitkeep runtime rejected this managed operation.",
     },
   };
 }

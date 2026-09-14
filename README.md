@@ -1,10 +1,13 @@
-# Agent Workflow
+# Orbitkeep
 
-`@agent-workflow/cli` is a provider-neutral workflow runtime for managers that
-coordinate Claude Code and Codex CLI specialists. It supplies durable,
-JSON-validated assignment state; plan approval and ownership controls;
-provider adapters; generated role definitions; retention and archival tools;
-and an auditable event ledger stored in the consuming project.
+**Keep every agent on mission.**
+
+`orbitkeep` is a provider-neutral control plane for governed agent work. A
+Flight Director coordinates Claude Code and Codex CLI Mission Specialists
+inside autonomous repository Silos. Orbitkeep supplies durable, JSON-validated
+Mission state; Flight Plan Clearances and Command Authority; Docking Adapters;
+generated Crew definitions; retention and archival tools; and an auditable
+Flight Recorder stored in the consuming project.
 
 It is intentionally independent of application code. Install it into each
 repository that needs managed agent work; its runtime records stay in that
@@ -15,8 +18,8 @@ repository's ignored `.agent-state/` directory.
 The package requires Node.js 24.x.
 
 ```sh
-npm install --save-dev @agent-workflow/cli
-npx agent-workflow setup
+npm install --save-dev orbitkeep
+npx orbitkeep setup
 ```
 
 `setup` performs transactional initialization and immediately runs the health
@@ -33,8 +36,8 @@ For an incomplete or drifted installation, inspect the read-only repair plan
 before applying it:
 
 ```sh
-npx agent-workflow repair --plan
-npx agent-workflow repair --apply
+npx orbitkeep repair --plan
+npx orbitkeep repair --apply
 ```
 
 Install and repair operations are transactional. Before changing a file, the
@@ -46,9 +49,9 @@ correction and is never overwritten automatically.
 Inspect or recover installation transactions with:
 
 ```sh
-npx agent-workflow install --status
-npx agent-workflow install --recover
-npx agent-workflow install --rollback
+npx orbitkeep install --status
+npx orbitkeep install --recover
+npx orbitkeep install --rollback
 ```
 
 Rollback refuses to overwrite a file that changed after the transaction
@@ -61,10 +64,10 @@ Upgrade only with the target package version already installed. Review the
 versioned plan, then explicitly authorize any mutable-state migration:
 
 ```sh
-npx agent-workflow upgrade --plan
-npx agent-workflow upgrade --apply
-npx agent-workflow upgrade --status
-npx agent-workflow upgrade --rollback
+npx orbitkeep upgrade --plan
+npx orbitkeep upgrade --apply
+npx orbitkeep upgrade --status
+npx orbitkeep upgrade --rollback
 ```
 
 `upgrade --apply` is the explicit authorization to apply the displayed plan,
@@ -74,9 +77,11 @@ second approval flag. Library callers must still pass
 
 The plan classifies files as `create`, `replace-managed`, `reconcile-shared`,
 `migrate-config`, `migrate-state`, `preserve`, `manual-conflict`, or `retire`.
-Only explicit one-way migrations registered by the target release may run; the
-0.4.0 release registers migration from 0.3.0. Other source versions stop for a
-manual migration decision rather than applying an inferred transformation.
+Only explicit one-way migrations registered by the target release may run;
+v0.4.1 registers the chain from 0.3.0 through 0.4.0 and its metadata-only state
+migration for the branding compatibility step. Canonical workflow records and
+event history are not renamed. Other source versions stop for a manual
+migration decision rather than applying an inferred transformation.
 Upgrade is blocked while an assignment or execution remains active, when a
 retired managed file contains user changes, or when a downgrade is requested.
 Migrations may update mutable aggregate or runtime records, but never rewrite
@@ -90,8 +95,8 @@ For local development before publication:
 
 ```sh
 npm pack
-npm install --save-dev /absolute/path/to/agent-workflow-0.4.0.tgz
-npx agent-workflow init
+npm install --save-dev /absolute/path/to/orbitkeep-0.4.1.tgz
+npx orbitkeep init
 ```
 
 `init` creates `.agent-workflow/` configuration and immutable contract copies,
@@ -100,22 +105,33 @@ the generated project configuration before enabling a provider.
 
 ## Operational model
 
-- A Manager starts or resumes an assignment, records a plan, and obtains or
-  explicitly waives the configured Executive approval before execution.
-- The Manager dispatches bounded specialist task packets. Specialists return
-  structured results; they do not change canonical workflow state.
-- State-changing commands use a Manager ownership fencing token. Provider
-  session identifiers are provenance only, not authority.
-- Events are append-only daily NDJSON ledgers. Active records and archive
-  operations are JSON-schema validated.
-- Raw provider responses are redacted and cleaned up after the configured
-  retention period; resolved workflow records are archived rather than deleted.
+- One installed repository is a **Silo**. It remains an autonomous local
+  governance boundary even when it later connects to Mission Control.
+- A **Flight Director** starts or resumes a **Mission**, records a **Flight
+  Plan**, and obtains or explicitly waives the configured Executive
+  **Clearance** before execution.
+- The Flight Director dispatches bounded **Mission Briefs** to **Mission
+  Specialists**. Specialists return structured **Mission Reports**; they do
+  not change canonical workflow state.
+- Mission state-changing commands require fenced **Command Authority**.
+  Provider session identifiers are provenance only, not authority.
+- The **Flight Recorder** uses append-only daily NDJSON event ledgers. Active
+  records and archive operations are JSON-schema validated.
+- The **Black Box** holds short-retention redacted provider responses;
+  **Containment Bay** records preserve rejected submissions and validation
+  failures; resolved workflow records enter the **Mission Archive**.
+
+The product vocabulary maps to stable canonical v0.x record names. For
+example, Mission maps to `assignment`, Operation to `task`, and Run to
+`execution`. See [docs/domain-model.md](docs/domain-model.md) for the complete
+hierarchy and compatibility map.
 
 See [contracts/README.md](contracts/README.md) for the installed operating
-contracts and `agent-workflow --help` for the CLI command surface. Detailed
+contracts and `orbitkeep --help` for the CLI command surface. Detailed
 operator guides are available in [docs/installation.md](docs/installation.md),
 [docs/upgrading.md](docs/upgrading.md), and
-[docs/troubleshooting.md](docs/troubleshooting.md).
+[docs/troubleshooting.md](docs/troubleshooting.md). The extended platform plan
+is maintained in [docs/roadmap.md](docs/roadmap.md).
 
 ## Development
 
@@ -134,30 +150,35 @@ to control a provider action without observable confirmation.
 
 ## Roadmap
 
-The planned release sequence keeps the local governance runtime useful while
-adding orchestration and isolation in bounded stages:
+- **v0.4.1 — Orbitkeep identity:** product terminology, Crew display names,
+  stable compatibility aliases, and release verification.
+- **v0.5 — Silo foundations:** durable Silo identity, Keep and Colony
+  membership, Charter precedence, Relay contracts, workflow dependencies,
+  budgets, templates, and usage observations.
+- **v0.6 — Mission Modules and Airlocks:** optional Docker isolation,
+  per-Run worktrees, resource and secret controls, ingress/egress validation,
+  consequential-action gates, result capture, cleanup, and recovery.
+- **v0.7 — Relay and federation:** authenticated multi-Silo communication,
+  bounded disconnected operation, remote runners, and central Flight Recorder
+  replication.
+- **v0.8 — Mission Control and Telemetry:** the human control interface,
+  Clearances, live Mission views, analytics, alerts, and audit drill-down.
+- **v1.0 — Production control plane:** stable APIs, multi-user identity,
+  organization governance, signed Charter distribution, supported deployment,
+  recovery, and extension contracts.
 
-- **v0.4 — Developer preview:** transactional setup, repair, upgrade and
-  rollback; provider-neutral Claude Code and Codex CLI management; durable
-  workflow records, lifecycle controls, and release verification.
-- **v0.5 — Workflow completion:** enforced task dependencies and quality
-  gates, execution budgets, reusable workflow templates, cross-platform
-  compatibility, and provider-neutral usage telemetry with local reporting.
-- **v0.6 — Isolated execution:** an optional Docker execution adapter with
-  per-task worktrees, resource and timeout limits, network and secret policies,
-  result capture, cleanup, and recovery.
-- **Later platform releases:** remote runners, a central control plane,
-  organization policies, analytics and optimization dashboards, and shared
-  artifact services.
+See [docs/roadmap.md](docs/roadmap.md) for scope, exit criteria, and
+cross-cutting architectural rules.
 
 The local CLI remains usable without Docker. Container isolation becomes the
 recommended backend when agents run concurrently, operate unattended, or need
 broad tool and shell permissions.
 
-## Publishing
+## Compatibility
 
-The current package name is reserved as `@agent-workflow/cli`. Before the first
-registry publication, confirm that the selected npm scope is owned by the
-publisher and add the public repository URL to `package.json`. The package can
-already be installed from a local tarball or Git source while that decision is
-pending.
+Orbitkeep retains the legacy `agent-workflow` executable alias and the existing
+`.agent-workflow/` and `.agent-state/` directories in v0.4.1. Persisted schema
+identifiers, record formats, and runtime actor identifiers also remain stable.
+New documentation and installations use the `orbitkeep` command. The alias is
+provided to make upgrades non-breaking and may be removed only in a future
+major release with an explicit migration path.

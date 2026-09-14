@@ -31,11 +31,16 @@ export async function inspectClaudeHooks(filename: string): Promise<ClaudeHookIn
 }
 
 async function hasCodexIntegration(filename: string): Promise<boolean> {
-  return readFile(filename, "utf8").then((text) => text.includes("Agent Workflow CLI Integration") && text.includes("pinned Agent Workflow CLI")).catch(() => false);
+  return readFile(filename, "utf8").then((text) =>
+    (text.includes("Orbitkeep CLI Integration") && text.includes("pinned Orbitkeep CLI")) ||
+    (text.includes("Agent Workflow CLI Integration") && text.includes("pinned Agent Workflow CLI")),
+  ).catch(() => false);
 }
 
 async function hasClaudeIntegration(filename: string): Promise<boolean> {
-  return readFile(filename, "utf8").then((text) => text.includes("Agent Workflow Manager Integration") && text.includes("Agent Workflow CLI")).catch(() => false);
+  return readFile(filename, "utf8").then((text) =>
+    text.includes("Orbitkeep Flight Director Integration") || text.includes("Orbitkeep Manager Integration") || text.includes("Agent Workflow Manager Integration"),
+  ).catch(() => false);
 }
 
 type ProviderActivationStatus = "off" | "active" | "repair_required" | "unsupported";
@@ -45,12 +50,12 @@ function assessProviderActivation(provider: string, enabled: boolean, configured
   if (!enabled || requiredMode === "off") return { status: "off", requiredMode: "off", reason: "The provider is not requested by project policy." };
   if (provider === "claude") {
     if (requiredMode === "brokered") return { status: "unsupported", requiredMode, reason: "Brokered Claude execution is not yet installed by the consumer bootstrap." };
-    if (requiredMode === "instructions") return integrations.claude ? { status: "active", requiredMode, reason: "Claude Manager instructions are installed." } : { status: "repair_required", requiredMode, reason: "Claude Manager instructions are missing." };
+    if (requiredMode === "instructions") return integrations.claude ? { status: "active", requiredMode, reason: "Claude Flight Director instructions are installed." } : { status: "repair_required", requiredMode, reason: "Claude Flight Director instructions are missing." };
     return hooks.valid ? { status: "active", requiredMode, reason: "Claude hooks meet the requested workflow mode." } : { status: "repair_required", requiredMode, reason: `Claude hooks are incomplete (missing: ${hooks.missing.join(", ") || "none"}; unpinned: ${hooks.mismatched.join(", ") || "none"}).` };
   }
   if (provider === "codex") {
     if (requiredMode !== "instructions") return { status: "unsupported", requiredMode, reason: `Codex ${requiredMode} mode is not established by Manager instructions alone.` };
-    return integrations.codex ? { status: "active", requiredMode, reason: "Codex Manager instructions are installed." } : { status: "repair_required", requiredMode, reason: "Codex Manager instructions are missing." };
+    return integrations.codex ? { status: "active", requiredMode, reason: "Codex Flight Director instructions are installed." } : { status: "repair_required", requiredMode, reason: "Codex Flight Director instructions are missing." };
   }
   return { status: "unsupported", requiredMode, reason: `No installer adapter is available for provider ${provider}.` };
 }
@@ -116,7 +121,7 @@ export async function doctor(projectRoot: string) {
   const codexIntegrated = await hasCodexIntegration(path.join(projectRoot, "AGENTS.md"));
   const claudeIntegrated = await hasClaudeIntegration(path.join(projectRoot, "CLAUDE.md"));
   if ((effective?.config.providers.claude?.enabled ?? false) && !claudeHooks.valid) warnings.push(`Claude hook integration is incomplete (missing: ${claudeHooks.missing.join(", ") || "none"}; unpinned: ${claudeHooks.mismatched.join(", ") || "none"}).`);
-  if ((effective?.config.providers.codex?.enabled ?? false) && !codexIntegrated) warnings.push("Codex manager instructions do not reference the pinned Agent Workflow CLI.");
+  if ((effective?.config.providers.codex?.enabled ?? false) && !codexIntegrated) warnings.push("Codex manager instructions do not reference the pinned Orbitkeep CLI.");
   const requiredContracts = ["README.md", "MANAGER.md", "CONTRACTS.md", "ROLES.md"];
   const missingContracts = (await Promise.all(requiredContracts.map(async (name) => await exists(path.join(projectRoot, ".agent-workflow", "contracts", name)) ? undefined : name))).filter((name): name is string => name !== undefined);
   if (missingContracts.length) errors.push(`Installed workflow contracts are missing: ${missingContracts.join(", ")}.`);
@@ -151,8 +156,8 @@ export async function doctor(projectRoot: string) {
   const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
   const packageRelative = path.relative(projectRoot, packageRoot);
   const normalizedPackageRelative = packageRelative.split(path.sep).join("/");
-  const installedFromNodeModules = normalizedPackageRelative === "node_modules/@agent-workflow/cli" || normalizedPackageRelative.startsWith("node_modules/@agent-workflow/cli/");
-  if (packageRelative === "" || (!packageRelative.startsWith("..") && !path.isAbsolute(packageRelative) && !installedFromNodeModules)) warnings.push("The active Agent Workflow CLI is workspace-linked and mutable; create a pinned packaged installation before treating the integration as release-ready.");
+  const installedFromNodeModules = normalizedPackageRelative === "node_modules/orbitkeep" || normalizedPackageRelative.startsWith("node_modules/orbitkeep/") || normalizedPackageRelative === "node_modules/@agent-workflow/cli" || normalizedPackageRelative.startsWith("node_modules/@agent-workflow/cli/");
+  if (packageRelative === "" || (!packageRelative.startsWith("..") && !path.isAbsolute(packageRelative) && !installedFromNodeModules)) warnings.push("The active Orbitkeep CLI is workspace-linked and mutable; create a pinned packaged installation before treating the integration as release-ready.");
   info.push("Local ignored state is not a backup.", "Live cross-provider process takeover is unsupported.");
   const providerStatuses = Object.fromEntries(Object.entries(effective?.config.providers ?? {}).sort(([left], [right]) => left.localeCompare(right)).map(([provider, policy]) => [provider, assessProviderActivation(provider, policy.enabled, policy.requiredMode, { claude: claudeIntegrated, codex: codexIntegrated }, claudeHooks)]));
   const providerFailures = Object.values(providerStatuses).filter((item) => item.status === "repair_required" || item.status === "unsupported");

@@ -13,7 +13,7 @@ For an accepted pre-tool request the adapter emits no permission decision, so
 Claude's normal permission flow remains in force. For a runtime rejection it
 emits the documented `PreToolUse` denial response.
 
-Installed hooks invoke `npx --no-install agent-workflow`, resolving the binary
+Installed hooks invoke `npx --no-install orbitkeep`, resolving the binary
 from the consumer's pinned dependency rather than referencing framework source
 inside an incubating repository. Observable raw responses may be persisted only
 through the exported redacting persistence contract.
