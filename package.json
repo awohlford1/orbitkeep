@@ -3,7 +3,7 @@
   "version": "0.4.1",
   "license": "MIT",
   "type": "module",
-  "description": "Mission control for governed, provider-neutral agent work.",
+  "description": "Local-first control plane for governed, provider-neutral agent work.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/awohlford1/orbitkeep.git"

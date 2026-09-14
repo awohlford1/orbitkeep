@@ -33,6 +33,9 @@ Orbitkeep
 
 ## Platform scopes
 
+- **Orbitkeep Core:** the provider-neutral policy, workflow, validation, and
+  persistence engine used by the CLI and future platform clients. User
+  interfaces and transport services cannot bypass Core.
 - **Keep:** one user, team, or organization's Orbitkeep environment and its
   top-level authority boundary.
 - **Colony:** a logical product, program, or related group of repositories.
@@ -52,6 +55,20 @@ Orbitkeep
   analytics. Derived values must retain source event references where possible.
 - **Flight Recorder:** authoritative append-only audit and event history. Each
   Silo writes locally; a future central recorder ingests verifiable copies.
+
+## Authority and storage boundaries
+
+- A Silo is authoritative for the work it directly executes and observes.
+- Mission Control requests and displays actions through Orbitkeep Core; it is
+  not an alternate mutation path.
+- Relay transports authenticated, idempotent messages. Delivery alone does not
+  prove that an action ran or succeeded.
+- A central Flight Recorder stores verifiable replicas without rewriting a
+  Silo's local event history.
+- Telemetry is derived from referenced records and distinguishes observed
+  measurements from estimates.
+- Platform metadata, transport state, artifacts, and authoritative workflow
+  history are separate storage concerns with separate recovery policies.
 
 ## Mission scopes
 

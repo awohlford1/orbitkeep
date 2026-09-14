@@ -13,6 +13,19 @@ It is intentionally independent of application code. Install it into each
 repository that needs managed agent work; its runtime records stay in that
 repository's ignored `.agent-state/` directory.
 
+## Product status
+
+Orbitkeep v0.4.1 is a local-first developer preview and CLI MVP. Its local
+Mission governance, Claude and Codex dispatch, Flight Plans, Clearances,
+Command Authority, Flight Recorder, installation repair, upgrades, retention,
+and archival are implemented and validated. Multi-Silo federation, container
+isolation, a hosted control plane, Mission Control, Telemetry, and multi-user
+identity are planned capabilities and are not part of the current release.
+
+The local Silo remains a supported deployment mode as the platform grows. A
+future Keep coordinates Silos without replacing their authoritative local
+execution history or allowing central services to infer unobserved outcomes.
+
 ## Install
 
 The package requires Node.js 24.x.
@@ -152,9 +165,11 @@ to control a provider action without observable confirmation.
 
 - **v0.4.1 — Orbitkeep identity:** product terminology, Crew display names,
   stable compatibility aliases, and release verification.
-- **v0.5 — Silo foundations:** durable Silo identity, Keep and Colony
-  membership, Charter precedence, Relay contracts, workflow dependencies,
-  budgets, templates, and usage observations.
+- **v0.5 — Silo and workflow foundations:** durable Silo identity and health,
+  deterministic dependency scheduling, quality gates, budgets, reusable
+  workflows, Charter evaluation, Relay contracts and an in-memory reference
+  transport, provider-neutral usage observations, and cross-platform
+  qualification.
 - **v0.6 — Mission Modules and Airlocks:** optional Docker isolation,
   per-Run worktrees, resource and secret controls, ingress/egress validation,
   consequential-action gates, result capture, cleanup, and recovery.
@@ -168,7 +183,9 @@ to control a provider action without observable confirmation.
   recovery, and extension contracts.
 
 See [docs/roadmap.md](docs/roadmap.md) for scope, exit criteria, and
-cross-cutting architectural rules.
+cross-cutting architectural rules. See
+[docs/product-plan.md](docs/product-plan.md) for the product maturity model,
+delivery workstreams, sequencing, risks, and unresolved platform decisions.
 
 The local CLI remains usable without Docker. Container isolation becomes the
 recommended backend when agents run concurrently, operate unattended, or need

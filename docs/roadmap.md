@@ -5,6 +5,11 @@ Orbitkeep platform. Release boundaries are capability gates, not dates. A phase
 is complete only when its behavior, failure modes, recovery, and evidence are
 validated on supported platforms.
 
+Orbitkeep v0.4.1 is a local-first developer preview and CLI MVP. The framework
+must not be represented as a distributed, isolated, multi-user platform until
+the applicable later release gates are satisfied. The detailed product and
+delivery model is maintained in [product-plan.md](product-plan.md).
+
 ## v0.4.1 — Orbitkeep identity
 
 Scope:
@@ -31,22 +36,46 @@ Exit criteria:
 Scope:
 
 - Add durable Silo identity and optional Keep and Colony membership metadata.
-- Define Silo registration, capability, health, and disconnection states.
-- Complete task dependencies, quality gates, execution budgets, reusable
-  workflow templates, and cross-platform validation.
+- Define Silo registration, capability, health, key-rotation, disconnection,
+  degradation, blocking, and retirement states.
+- Add `silo status`, `silo register`, and `silo disconnect` operations without
+  making registration a prerequisite for local use.
+- Implement Operation dependency graphs, deterministic eligibility scheduling,
+  parallel and sequential execution, required and optional quality gates,
+  cancellation propagation, and conditional routing based on validated
+  outcomes.
+- Add Mission and Run token, cost, time, and concurrency budgets. Keep
+  retry policy distinct from result rework.
+- Add reusable, versioned workflow templates.
 - Emit provider-neutral usage observations suitable for later Telemetry.
 - Define Relay envelopes, ordering, idempotency, authentication, and replay
-  boundaries without requiring a central service for local operation.
-- Define central Charter versus Local Charter precedence and signature rules.
+  boundaries, then implement an in-memory reference transport without
+  requiring a central service for local operation.
+- Implement a Charter policy engine covering providers, models, resources,
+  filesystem, network, secrets, Crew, gates, Clearances, consequential actions,
+  retention, and redaction.
+- Define central Charter versus Local Charter precedence, signature, rotation,
+  and failure rules.
+- Establish the public SDK/API boundary used by the CLI and future platform
+  clients.
+- Qualify Windows, macOS, and Linux across clean, partial, malformed,
+  customized, legacy, single-provider, and dual-provider installations.
 
 Exit criteria:
 
 - A Silo remains fully usable in local-only mode.
+- Silo identity survives repair and upgrade and cannot be silently regenerated.
 - Identity and membership additions have explicit migrations and cannot weaken
   existing governance.
+- The scheduler produces deterministic eligible Operations and enforces
+  dependencies, gates, budgets, cancellation, retry, and rework rules without
+  depending on manager prose.
+- Effective policy is the intersection of central limits and local
+  restrictions; local policy cannot silently expand authority.
 - Relay and Charter contracts have adversarial and offline-behavior tests.
 - No central component is treated as authoritative for local state it has not
   durably acknowledged.
+- The supported-platform qualification suite passes.
 
 ## v0.6 — Mission Modules and Airlocks
 
@@ -79,6 +108,10 @@ Scope:
 - Add remote Module runners and artifact transfer with integrity verification.
 - Replicate Silo event records to a central Flight Recorder without changing
   local event history.
+- Introduce a stateless control API, durable platform metadata storage, and
+  integrity-verified artifact storage behind replaceable interfaces. PostgreSQL,
+  Redis, and object storage are the initial reference deployment choices;
+  Redis remains transport rather than canonical workflow state.
 
 Exit criteria:
 
@@ -119,12 +152,55 @@ Scope:
   upgrade, and security-hardening profiles.
 - Publish a formal extension model for providers, Relay transports, Airlocks,
   Telemetry exporters, and Module runtimes.
+- Add secrets-provider and artifact-store abstractions, workload identity,
+  cryptographic key rotation, release signing, software bills of materials,
+  and build provenance.
+- Publish service-level objectives, capacity limits, release channels,
+  deprecation guarantees, operator runbooks, and an open-source contribution
+  and governance policy.
 
 Exit criteria:
 
 - Upgrade and rollback paths are validated from every supported release.
 - Threat modeling, security review, reliability testing, and operator UAT pass.
 - Local-only and centrally managed deployments have explicit support contracts.
+- Backup restoration, regional or host failure recovery, workload isolation,
+  and key compromise procedures pass operator exercises.
+- Load, chaos, privacy, threat-model, and independent security reviews pass.
+
+## Release qualification matrix
+
+Every applicable release is tested across:
+
+- Windows, macOS, and Linux.
+- Clean, partial, malformed, customized, and legacy installations.
+- Claude-only, Codex-only, and dual-provider configurations.
+- Provider interruption, unavailable-provider, and prohibited-substitution
+  behavior.
+- Concurrent Missions, competing Flight Directors, expired leases, and
+  fencing-token rejection.
+- Upgrade and rollback from every supported release.
+- Duplicate, delayed, reordered, expired, and lost Relay messages once Relay is
+  implemented.
+- Redaction, secret exposure, write-scope, Airlock, and container-boundary
+  adversarial tests as those capabilities become available.
+
+## Cross-cutting product workstreams
+
+The following are release requirements, not deferred documentation exercises:
+
+- Public SDK and API stability separate from CLI presentation.
+- Extension contracts for providers, Relay transports, Airlocks, Telemetry,
+  Module runtimes, secrets providers, and artifact stores.
+- Authentication, workload identity, signatures, and cryptographic key
+  lifecycle management.
+- Platform database migrations, backups, restoration, and disaster recovery.
+- Security threat modeling, dependency policy, release signing, SBOMs, and
+  provenance.
+- Measurable performance, scale, availability, and recovery targets.
+- Explicit privacy and consent policy for product Telemetry.
+- Open-source licensing, contribution, governance, compatibility, release, and
+  support policies.
 
 ## Cross-cutting rules
 
