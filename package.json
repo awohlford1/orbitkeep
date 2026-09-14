@@ -49,6 +49,8 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "npm run build && tsc --noEmit",
     "test": "npm run build && node --test tests/**/*.test.ts",
+    "test:package": "node scripts/package-smoke.mjs",
+    "verify": "npm run roles:check && npm run lint && npm test && npm run test:package",
     "test:integration": "node --test tests/integration/*.test.ts",
     "test:conformance": "node --test tests/conformance/*.test.ts",
     "typecheck": "tsc --noEmit",

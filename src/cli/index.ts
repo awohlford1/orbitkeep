@@ -455,11 +455,17 @@ export async function runCli(): Promise<void> {
   const root = await findConsumerRoot(option("project-root") ?? process.cwd());
   const [command, subcommand] = process.argv.slice(2).filter((value) => !value.startsWith("--") && value !== option("json") && value !== option("project-root"));
   if (!command || command === "help" || process.argv.includes("--help") || process.argv.includes("-h")) { output({ commands: [
-    "init", "install --status|--recover|--rollback", "repair --plan|--apply", "doctor", "validate", "capabilities", "config show", "config validate", "upgrade --check|--plan|--apply|--status|--rollback", "--redact-output",
+    "setup", "init", "install --status|--recover|--rollback", "repair --plan|--apply", "doctor", "validate", "capabilities", "config show", "config validate", "upgrade --check|--plan|--apply|--status|--rollback", "--redact-output",
     "cleanup --dry-run|--apply", "archive --dry-run|--apply",
     "control launch|status|acknowledge-handover",
     ...MANAGED_WORKFLOW_COMMANDS,
   ] }); return; }
+  if (command === "setup") {
+    const installation = await installConsumer(root);
+    const health = await doctor(root);
+    output({ status: health.activation === "active" ? "ready" : "attention_required", installation, health, nextStep: health.activation === "active" ? "Agent Workflow is ready." : "Review health.errors, then run agent-workflow repair --plan." });
+    return;
+  }
   if (command === "init") { output(await installConsumer(root)); return; }
   if (command === "install") {
     const stateDirectory = await installationStateDirectory(root); const input = await jsonInput();
@@ -483,7 +489,7 @@ export async function runCli(): Promise<void> {
   if (command === "upgrade") {
     const input = await jsonInput();
     if (process.argv.includes("--plan")) { output(await planUpgrade(root, typeof input.targetVersion === "string" ? input.targetVersion : FRAMEWORK_VERSION)); return; }
-    if (process.argv.includes("--apply")) { output(await applyUpgrade(root, { targetVersion: typeof input.targetVersion === "string" ? input.targetVersion : FRAMEWORK_VERSION, authorizeStateMigration: process.argv.includes("--authorize-state-migration") || input.authorizeStateMigration === true })); return; }
+    if (process.argv.includes("--apply")) { output(await applyUpgrade(root, { targetVersion: typeof input.targetVersion === "string" ? input.targetVersion : FRAMEWORK_VERSION, authorizeStateMigration: true })); return; }
     if (process.argv.includes("--status")) { output(await upgradeStatus(root)); return; }
     if (process.argv.includes("--rollback")) { output(await rollbackUpgrade(root, typeof input.transactionId === "string" ? input.transactionId : undefined)); return; }
     output(checkUpgradeCompatibility({

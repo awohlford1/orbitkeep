@@ -16,9 +16,13 @@ The package requires Node.js 24.x.
 
 ```sh
 npm install --save-dev @agent-workflow/cli
-npx agent-workflow init
-npx agent-workflow doctor
+npx agent-workflow setup
 ```
+
+`setup` performs transactional initialization and immediately runs the health
+check. A `ready` result means the required files and configured provider
+integrations are active. Existing users may continue to run `init` and
+`doctor` separately.
 
 Successful initialization reports an overall activation state and a separate
 status for each configured provider. A requested provider mode is never
@@ -58,10 +62,15 @@ versioned plan, then explicitly authorize any mutable-state migration:
 
 ```sh
 npx agent-workflow upgrade --plan
-npx agent-workflow upgrade --apply --authorize-state-migration
+npx agent-workflow upgrade --apply
 npx agent-workflow upgrade --status
 npx agent-workflow upgrade --rollback
 ```
+
+`upgrade --apply` is the explicit authorization to apply the displayed plan,
+including its registered mutable-state migrations. It does not require a
+second approval flag. Library callers must still pass
+`authorizeStateMigration: true` to the programmatic API.
 
 The plan classifies files as `create`, `replace-managed`, `reconcile-shared`,
 `migrate-config`, `migrate-state`, `preserve`, `manual-conflict`, or `retire`.
@@ -103,7 +112,10 @@ the generated project configuration before enabling a provider.
   retention period; resolved workflow records are archived rather than deleted.
 
 See [contracts/README.md](contracts/README.md) for the installed operating
-contracts and `agent-workflow --help` for the CLI command surface.
+contracts and `agent-workflow --help` for the CLI command surface. Detailed
+operator guides are available in [docs/installation.md](docs/installation.md),
+[docs/upgrading.md](docs/upgrading.md), and
+[docs/troubleshooting.md](docs/troubleshooting.md).
 
 ## Development
 
@@ -113,6 +125,7 @@ npm run lint
 npm test
 npm run build
 npm pack --dry-run
+npm run test:package
 ```
 
 The package includes templates for both Claude Code and Codex CLI. Capability
