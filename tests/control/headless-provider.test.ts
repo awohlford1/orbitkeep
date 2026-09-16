@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
-import { buildHeadlessProviderInvocation, normalizeHeadlessProviderEvent } from "../../src/control/headless.ts";
+import { buildHeadlessProviderInvocation, normalizeHeadlessProviderEvent, selectHeadlessFinalMessage } from "../../src/control/headless.ts";
 
 test("headless provider invocations use non-interactive JSON streams and safe planning sandboxes", () => {
   const root = path.resolve("fixture-project");
@@ -21,4 +21,13 @@ test("provider-specific JSONL events normalize to a stable Orbitkeep event vocab
   assert.equal(codex.kind, "tool_completed");
   const failure = normalizeHeadlessProviderEvent("codex", { type: "error", message: "failed" });
   assert.equal(failure.kind, "error");
+});
+
+test("Claude Stop-hook feedback does not replace the provider-authored response", () => {
+  const events = [
+    normalizeHeadlessProviderEvent("claude", { type: "assistant", message: { content: [{ type: "text", text: '{"approach":["Inspect"],"acceptanceCriteria":["Report"]}' }] } }),
+    normalizeHeadlessProviderEvent("claude", { type: "result", result: "Stop hook feedback prevented shutdown." }),
+  ];
+  assert.equal(selectHeadlessFinalMessage(events), '{"approach":["Inspect"],"acceptanceCriteria":["Report"]}');
+  assert.equal(selectHeadlessFinalMessage([normalizeHeadlessProviderEvent("claude", { type: "result", result: "Fallback result" })]), "Fallback result");
 });

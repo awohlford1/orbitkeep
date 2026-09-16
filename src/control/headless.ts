@@ -113,6 +113,21 @@ function eventMessage(event: HeadlessProviderEvent): string {
   return typeof item.text === "string" ? item.text : textContent(item.content);
 }
 
+/**
+ * Selects the provider-authored response rather than trailing transport or
+ * hook feedback. Claude can emit a final `result` record whose text describes
+ * a Stop hook after its actual `assistant` response; that diagnostic must not
+ * replace a generated Flight Plan or Mission Report.
+ */
+export function selectHeadlessFinalMessage(events: readonly HeadlessProviderEvent[]): string {
+  const authored = events
+    .filter((event) => event.kind === "message" || event.kind === "tool_completed")
+    .map(eventMessage)
+    .filter(Boolean);
+  if (authored.length > 0) return authored.at(-1)!;
+  return events.map(eventMessage).filter(Boolean).at(-1) ?? "";
+}
+
 /** Runs a provider as a child process and keeps Orbitkeep as the user-facing control plane. */
 export async function runHeadlessProvider(input: RunHeadlessProviderInput): Promise<HeadlessProviderResult> {
   if (!input.prompt.trim()) throw Object.assign(new Error("A non-empty provider prompt is required."), { code: "PROVIDER_PROMPT_REQUIRED" });
@@ -148,7 +163,6 @@ export async function runHeadlessProvider(input: RunHeadlessProviderInput): Prom
   child.stdin.end(input.prompt);
 
   const events: HeadlessProviderEvent[] = [];
-  const messages: string[] = [];
   let providerSessionId: string | undefined;
   let stdoutBuffer = "";
   let stderr = "";
@@ -164,8 +178,6 @@ export async function runHeadlessProvider(input: RunHeadlessProviderInput): Prom
     const event = normalizeHeadlessProviderEvent(input.provider, raw);
     events.push(event);
     providerSessionId ??= eventSessionId(event);
-    const message = eventMessage(event);
-    if (message) messages.push(message);
     await input.onEvent?.(event);
   };
   child.stdout.on("data", (chunk: string) => {
@@ -190,7 +202,7 @@ export async function runHeadlessProvider(input: RunHeadlessProviderInput): Prom
     phase: input.phase,
     controlSession: completed ?? brokered.record,
     ...(providerSessionId ? { providerSessionId } : {}),
-    finalMessage: messages.at(-1) ?? "",
+    finalMessage: selectHeadlessFinalMessage(events),
     events,
     stderr,
     exitCode: outcome.exitCode,
