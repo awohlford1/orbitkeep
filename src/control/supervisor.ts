@@ -29,6 +29,7 @@ export interface SupervisorJobRecord {
   execution_id: string;
   created_at: string;
   updated_at: string;
+  last_activity_at?: string;
   control_session_id?: string;
   provider_session_id?: string;
   pid?: number;
@@ -210,6 +211,7 @@ async function recordUnsuccessfulMissionRun(input: LaunchRequest, outcome: "fail
 
 async function executeJob(stateRoot: string, input: LaunchRequest, job: SupervisorJobRecord, onSettled: () => void): Promise<void> {
   job.state = "starting"; job.updated_at = new Date().toISOString(); await writeJob(stateRoot, job);
+  let lastCheckpointAt = Date.now();
   let renewalInFlight = false; let consecutiveRenewalFailures = 0; let leaseFailure: Error | undefined;
   const renewalTimer = setInterval(() => {
     if (renewalInFlight || leaseFailure) return;
@@ -231,7 +233,12 @@ async function executeJob(stateRoot: string, input: LaunchRequest, job: Supervis
       },
       onEvent: async (event: HeadlessProviderEvent) => {
         job.event_count += 1;
-        await appendJobEvent(stateRoot, job.job_id, { recorded_at: new Date().toISOString(), source_event: "mission.supervisor.event", job_id: job.job_id, event_index: job.event_count, kind: event.kind, source_type: event.sourceType, data: event.data });
+        const at = new Date().toISOString(); job.last_activity_at = at;
+        await appendJobEvent(stateRoot, job.job_id, { recorded_at: at, source_event: "mission.supervisor.event", job_id: job.job_id, event_index: job.event_count, kind: event.kind, source_type: event.sourceType, data: event.data });
+        const operatorMeaningful = ["message", "tool_started", "tool_completed", "error"].includes(event.kind);
+        if (job.event_count === 1 || operatorMeaningful || job.event_count % 10 === 0 || Date.now() - lastCheckpointAt >= 2_000) {
+          job.updated_at = at; await writeJob(stateRoot, job); lastCheckpointAt = Date.now();
+        }
       },
     });
     if (leaseFailure) throw leaseFailure;

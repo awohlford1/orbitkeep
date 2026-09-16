@@ -20,7 +20,7 @@ import { ClaudeProviderAdapter } from "../providers/claude/index.ts";
 import { CodexProviderAdapter } from "../providers/codex/index.ts";
 import { persistRedactedRawResponse } from "../providers/index.ts";
 import { quarantineSubmission, readQuarantineSubmission, resolveQuarantine } from "../reconciliation/index.ts";
-import { acknowledgeHandover, bindBrokeredSession, controlStatus, flightPlanPrompt, getProviderManagerIdentity, handoverPackageId, inspectSupervisor, interruptBrokeredSessions, interruptControlledExecution, isBrokeredBootstrapOperation, isBrokeredManagementOperation, isBrokeredReadOnlyOperation, isHandoverAcknowledged, isParentOwnedLifecycleMutation, launchControlledCli, launchSupervisorJob, markResponseCaptureObserved, missionExecutionPrompt, parseGeneratedFlightPlan, readSupervisorEvents, resolveBrokeredSession, runHeadlessProvider, serveSupervisor, shutdownSupervisor, supervisorJobs, type BrokeredSessionRecord, type HeadlessProviderEvent, type SessionProvider } from "../control/index.ts";
+import { acknowledgeHandover, bindBrokeredSession, controlStatus, currentMissionWork, flightPlanPrompt, getProviderManagerIdentity, handoverPackageId, inspectSupervisor, interruptBrokeredSessions, interruptControlledExecution, isBrokeredBootstrapOperation, isBrokeredManagementOperation, isBrokeredReadOnlyOperation, isHandoverAcknowledged, isParentOwnedLifecycleMutation, launchControlledCli, launchSupervisorJob, markResponseCaptureObserved, meaningfulMissionActivity, missionExecutionPrompt, parseGeneratedFlightPlan, readBrokeredSession, readSupervisorEvents, resolveBrokeredSession, runHeadlessProvider, serveSupervisor, shutdownSupervisor, supervisorJobs, type BrokeredSessionRecord, type HeadlessProviderEvent, type SessionProvider } from "../control/index.ts";
 import type { NormalizedProviderSignal } from "../providers/claude/index.ts";
 import { captureGitWorkspaceSnapshot } from "../evidence/index.ts";
 import type { SignedExecutiveApprovalReceipt } from "../approvals/index.ts";
@@ -659,11 +659,16 @@ async function missionStatus(root: string, input: Input): Promise<unknown> {
     return { status: "succeeded", provider, mission: missionProjection(refreshed), jobs: await supervisorJobs(stateRoot, explicit), ...(awaitingAcceptance ? { nextStep: "Review the Mission Report with `orbitkeep mission logs`, then run `orbitkeep mission accept`." } : {}) };
   }
   const assignments = (await current.repository.listAssignments?.() ?? []).filter((candidate) => candidate.managerInstanceId === managerInstanceId);
-  const missions = (await Promise.all(assignments.map((candidate) => current.repository.get(candidate.assignmentId)))).filter(Boolean).map(missionProjection);
+  const aggregates = (await Promise.all(assignments.map((candidate) => current.repository.get(candidate.assignmentId)))).filter((assignment): assignment is NonNullable<typeof assignment> => Boolean(assignment));
+  const missions = aggregates.map(missionProjection);
   const missionIds = new Set(assignments.map((candidate) => candidate.assignmentId));
   const jobs = (await supervisorJobs(stateRoot)).filter((job) => missionIds.has(job.assignment_id));
-  const awaitingAcceptance = (await Promise.all(assignments.map((candidate) => current.repository.get(candidate.assignmentId)))).some((assignment) => assignment?.tasks.some((task) => task.state === "result_submitted"));
-  return { status: "succeeded", provider, missions, jobs, nextStep: missions.length === 0 ? "Start a Mission with `orbitkeep mission start`." : awaitingAcceptance ? "A Mission Report is awaiting review. Use `orbitkeep mission logs`, then `orbitkeep mission accept`." : undefined };
+  const latestJob = jobs[0]; const latestAggregate = latestJob ? aggregates.find((assignment) => assignment.assignmentId === latestJob.assignment_id) : aggregates[0];
+  const awaitingAcceptance = latestAggregate?.tasks.some((task) => task.state === "result_submitted") ?? false;
+  const nextStep = missions.length === 0 ? "Start a Mission with `orbitkeep mission start`."
+    : latestJob && ["queued", "starting", "running"].includes(latestJob.state) ? "The Mission is still running. Use `orbitkeep mission logs` to inspect current activity."
+    : awaitingAcceptance ? "A Mission Report is awaiting review. Use `orbitkeep mission logs`, then `orbitkeep mission accept`." : undefined;
+  return { status: "succeeded", provider, ...(latestAggregate ? { mission: missionProjection(latestAggregate) } : {}), missions, jobs, nextStep };
 }
 
 async function missionList(root: string): Promise<unknown> {
@@ -689,7 +694,7 @@ async function missionLogs(root: string, input: Input): Promise<unknown> {
   if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 1_000) throw Object.assign(new Error("Mission log limit must be an integer from 1 to 1000."), { code: "MISSION_LOG_LIMIT_INVALID" });
   const events = await readSupervisorEvents(selected.stateRoot, job.job_id, requestedLimit);
   const final = [...events].reverse().map((event) => event !== null && typeof event === "object" ? event as Record<string, unknown> : {}).find((event) => event.kind === "final_response");
-  return { status: "succeeded", code: "MISSION_LOGS_AVAILABLE", mission: missionProjection(selected.assignment), job, events, eventLimit: requestedLimit, ...(typeof final?.final_message === "string" ? { result: final.final_message } : {}) };
+  return { status: "succeeded", code: "MISSION_LOGS_AVAILABLE", mission: missionProjection(selected.assignment), job, events, activity: meaningfulMissionActivity(events), currentWork: currentMissionWork(events), eventLimit: requestedLimit, ...(typeof final?.final_message === "string" ? { result: final.final_message } : {}) };
 }
 
 async function missionAsk(root: string, input: Input): Promise<unknown> {
@@ -772,7 +777,24 @@ async function missionAccept(root: string, input: Input): Promise<unknown> {
 
 async function supervisorCommand(root: string, subcommand: string | undefined, input: Input): Promise<unknown> {
   const current = await service(root); const { stateRoot } = await initializeStateRoot(root, current.effective.config.state.directory);
-  if (subcommand === "status") return { status: "succeeded", supervisor: await inspectSupervisor(stateRoot) };
+  if (subcommand === "status") {
+    const inspection = await inspectSupervisor(stateRoot);
+    const active = inspection.jobs.filter((job) => ["queued", "starting", "running"].includes(job.state));
+    const activeMissions = await Promise.all(active.map(async (job) => {
+      const [assignment, session, events] = await Promise.all([
+        current.repository.get(job.assignment_id),
+        job.control_session_id ? readBrokeredSession(stateRoot, job.control_session_id) : undefined,
+        readSupervisorEvents(stateRoot, job.job_id, 1_000),
+      ]);
+      return {
+        missionId: job.assignment_id, objective: assignment?.objective, provider: job.provider, state: job.state,
+        eventCount: job.event_count, lastActivityAt: job.last_activity_at ?? job.updated_at,
+        process: { pid: job.pid, state: session?.state ?? job.state, kind: session?.kind ?? "manager", controlSessionId: job.control_session_id, providerSessionId: job.provider_session_id },
+        currentWork: currentMissionWork(events), activity: meaningfulMissionActivity(events, 1),
+      };
+    }));
+    return { status: "succeeded", supervisor: { ...inspection, activeMissions } };
+  }
   if (subcommand === "stop") {
     const timeoutMs = Number(input.timeoutMs ?? option("timeout-ms") ?? 5_000);
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 0) throw Object.assign(new Error("Supervisor stop timeout must be a nonnegative integer."), { code: "SUPERVISOR_STOP_TIMEOUT_INVALID" });

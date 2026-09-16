@@ -88,8 +88,20 @@ export function normalizeHeadlessProviderEvent(provider: SessionProvider, raw: u
   const value = record(raw);
   const sourceType = String(value.type ?? value.event ?? "unknown");
   let kind: HeadlessProviderEventKind = "unknown";
-  if (["system", "thread.started", "session.started"].includes(sourceType)) kind = "session_started";
-  else if (["assistant", "message", "item.updated"].includes(sourceType)) kind = "message";
+  if (provider === "claude" && sourceType === "system") {
+    const subtype = String(value.subtype ?? "");
+    kind = subtype === "task_started" ? "tool_started" : subtype === "task_notification" ? "tool_completed" : subtype === "thinking_tokens" ? "usage" : "session_started";
+  }
+  else if (provider === "claude" && sourceType === "assistant") {
+    const content = Array.isArray(record(value.message).content) ? record(value.message).content as Array<Record<string, unknown>> : [];
+    kind = content.some((item) => item.type === "tool_use") ? "tool_started" : "message";
+  }
+  else if (provider === "claude" && sourceType === "user") {
+    const content = Array.isArray(record(value.message).content) ? record(value.message).content as Array<Record<string, unknown>> : [];
+    kind = content.some((item) => item.type === "tool_result") ? "tool_completed" : "message";
+  }
+  else if (["thread.started", "session.started"].includes(sourceType)) kind = "session_started";
+  else if (["message", "item.updated"].includes(sourceType)) kind = "message";
   else if (["item.started", "tool.started", "tool_use"].includes(sourceType)) kind = "tool_started";
   else if (["item.completed", "tool.completed", "tool_result"].includes(sourceType)) kind = "tool_completed";
   else if (["result", "turn.completed", "task.completed"].includes(sourceType)) kind = "result";

@@ -22,7 +22,11 @@ async function fakeCodex(directory: string): Promise<{ bin: string; executable: 
     'const text = prompt.includes("headless planning worker")',
     '  ? JSON.stringify({ approach: ["Inspect safely"], acceptanceCriteria: ["Summary is produced"] })',
     '  : "Execution completed through the Orbitkeep parent process.";',
-    'if (!prompt.includes("headless planning worker") && prompt.includes("Keep running until stopped")) await new Promise((resolve) => setTimeout(resolve, 10_000));',
+    'if (!prompt.includes("headless planning worker") && prompt.includes("Keep running until stopped")) {',
+    '  console.log(JSON.stringify({ type: "item.started", item: { id: "live-work", type: "command_execution", command: "inspect repository" } }));',
+    '  await new Promise((resolve) => setTimeout(resolve, 10_000));',
+    '  console.log(JSON.stringify({ type: "item.completed", item: { id: "live-work", type: "command_execution", command: "inspect repository" } }));',
+    '}',
     'console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text } }));',
     'console.log(JSON.stringify({ type: "turn.completed", usage: { input_tokens: 1, output_tokens: 1 } }));',
   ].join("\n"));
@@ -62,6 +66,19 @@ async function waitForLatestJob(root: string, environment: NodeJS.ProcessEnv, pr
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error("Timed out waiting for the detached supervisor job.");
+}
+
+async function waitForLiveProgress(root: string, environment: NodeJS.ProcessEnv, provider: "codex" | "claude", missionId: string): Promise<{ state: string; event_count: number; last_activity_at?: string; pid?: number }> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const statusResult = await run(root, environment, ["mission", "status"], { provider, missionId });
+    assert.equal(statusResult.code, 0, `${statusResult.stderr}\n${statusResult.stdout}`);
+    const status = JSON.parse(statusResult.stdout) as { jobs: Array<{ state: string; event_count: number; last_activity_at?: string; pid?: number }> };
+    const job = status.jobs[0];
+    if (job && job.state === "running" && job.event_count >= 2 && job.last_activity_at) return job;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Timed out waiting for live Mission progress.");
 }
 
 test("mission start owns planning, approval, and headless execution outside the provider interface", async () => {
@@ -205,6 +222,24 @@ test("public supervisor controls discover active work and require an explicit fo
   const startedResult = await run(root, environment, ["mission", "start", "--approve"], { objective: "Keep running until stopped", provider: "codex" });
   assert.equal(startedResult.code, 0, `${startedResult.stderr}\n${startedResult.stdout}`);
   const started = JSON.parse(startedResult.stdout) as { mission: { assignmentId: string } };
+
+  const live = await waitForLiveProgress(root, environment, "codex", started.mission.assignmentId);
+  assert.ok(live.event_count >= 2, "event count is checkpointed while the provider is still running");
+  assert.ok(live.last_activity_at);
+  assert.ok(live.pid);
+
+  const statusResult = await run(root, environment, ["mission", "status"], { provider: "codex" });
+  assert.equal(statusResult.code, 0, `${statusResult.stderr}\n${statusResult.stdout}`);
+  const status = JSON.parse(statusResult.stdout) as { mission: { objective: string }; nextStep: string };
+  assert.equal(status.mission.objective, "Keep running until stopped");
+  assert.match(status.nextStep, /still running/);
+
+  const supervisorResult = await run(root, environment, ["supervisor", "status"], {});
+  assert.equal(supervisorResult.code, 0, `${supervisorResult.stderr}\n${supervisorResult.stdout}`);
+  const supervisor = JSON.parse(supervisorResult.stdout) as { supervisor: { activeMissions: Array<{ objective: string; process: { pid?: number }; currentWork: Array<{ name: string }> }> } };
+  assert.equal(supervisor.supervisor.activeMissions[0]?.objective, "Keep running until stopped");
+  assert.ok(supervisor.supervisor.activeMissions[0]?.process.pid);
+  assert.deepEqual(supervisor.supervisor.activeMissions[0]?.currentWork.map((item) => item.name), ["command execution"]);
 
   const listedResult = await run(root, environment, ["mission", "list"], {});
   assert.equal(listedResult.code, 0, `${listedResult.stderr}\n${listedResult.stdout}`);

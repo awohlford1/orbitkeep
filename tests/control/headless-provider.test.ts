@@ -21,6 +21,11 @@ test("provider-specific JSONL events normalize to a stable Orbitkeep event vocab
   assert.equal(codex.kind, "tool_completed");
   const failure = normalizeHeadlessProviderEvent("codex", { type: "error", message: "failed" });
   assert.equal(failure.kind, "error");
+  assert.equal(normalizeHeadlessProviderEvent("claude", { type: "assistant", message: { content: [{ type: "tool_use", name: "Bash" }] } }).kind, "tool_started");
+  assert.equal(normalizeHeadlessProviderEvent("claude", { type: "user", message: { content: [{ type: "tool_result" }] } }).kind, "tool_completed");
+  assert.equal(normalizeHeadlessProviderEvent("claude", { type: "system", subtype: "task_started" }).kind, "tool_started");
+  assert.equal(normalizeHeadlessProviderEvent("claude", { type: "system", subtype: "task_notification" }).kind, "tool_completed");
+  assert.equal(normalizeHeadlessProviderEvent("claude", { type: "system", subtype: "thinking_tokens" }).kind, "usage");
 });
 
 test("a final Claude hook outcome remains authoritative and cannot be hidden by earlier assistant text", () => {

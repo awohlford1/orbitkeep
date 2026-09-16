@@ -52,6 +52,10 @@ public API when the migration is documented.
   raw provider-response persistence remains disabled unless explicitly enabled.
 - Human Mission status, activity, stop, and supervisor-control guidance now
   exposes useful progress and recovery actions without requiring JSON output.
+- Live Mission status checkpoints operator-relevant provider events, selects the
+  latest job's objective and review state, and reports the provider process,
+  active tools/agents, and meaningful Claude or Codex activity through the
+  Mission and supervisor views.
 
 ### Security
 

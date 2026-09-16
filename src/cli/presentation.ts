@@ -126,35 +126,36 @@ function missionSummary(value: unknown): string[] {
     "Supervisor control: use `npx orbitkeep supervisor status` or `npx orbitkeep supervisor stop`.",
   ];
   if (result.code === "MISSION_LOGS_AVAILABLE") {
-    const events = Array.isArray(result.events) ? result.events : [];
-    const recent = events.slice(-10).map((item) => {
-      const event = object(item); const data = object(event.data); const nestedMessage = object(data.message); const nestedItem = object(data.item);
-      const detail = typeof event.final_message === "string" ? event.final_message
-        : typeof data.result === "string" ? data.result
-        : typeof data.text === "string" ? data.text
-        : typeof nestedItem.text === "string" ? nestedItem.text
-        : typeof nestedMessage.content === "string" ? nestedMessage.content
-        : label(event.source_type);
-      const singleLine = detail.replace(/\s+/g, " ").trim();
-      return `- ${label(event.kind, "activity").replaceAll("_", " ")}${singleLine ? `: ${singleLine.slice(0, 240)}` : ""}`;
-    });
-    return ["✓ Mission activity loaded", "", `Objective: ${label(mission.objective)}`, `Job: ${label(job.state)}`, `Events retained in this view: ${events.length}`, ...(job.error ? [`Error: ${label(object(job.error).message)}`] : []), ...(recent.length ? ["", "Recent activity", ...recent] : []), ...(typeof result.result === "string" ? ["", "Mission result", result.result] : []), "", "Use --json for the normalized event stream or --limit N to change the view (maximum 1000)."];
+    const events = Array.isArray(result.events) ? result.events : []; const activity = Array.isArray(result.activity) ? result.activity.map(object) : []; const work = Array.isArray(result.currentWork) ? result.currentWork.map(object) : [];
+    const recent = activity.map((item) => `- ${label(item.label)}${typeof item.detail === "string" ? `: ${item.detail}` : ""}${typeof item.at === "string" ? ` (${item.at})` : ""}`);
+    const current = work.map((item) => `- ${label(item.kind)} ${label(item.name)}${typeof item.detail === "string" ? ` — ${item.detail}` : ""}`);
+    return ["✓ Mission activity loaded", "", `Objective: ${label(mission.objective)}`, `Job: ${label(job.state)}`, `Events retained in this view: ${events.length}`, ...(job.error ? [`Error: ${label(object(job.error).message)}`] : []), ...(current.length ? ["", "Currently running", ...current] : []), ...(recent.length ? ["", "Recent meaningful activity", ...recent] : []), ...(typeof result.result === "string" ? ["", "Mission result", result.result] : []), "", "Use --json for the normalized event stream or --limit N to change the view (maximum 1000)."];
   }
   const jobs = Array.isArray(result.jobs) ? result.jobs.map(object) : [];
   if (jobs.length > 0) {
     const latest = jobs[0]!;
-    return ["✓ Mission status", "", `Objective: ${label(mission.objective, Array.isArray(result.missions) && result.missions.length === 1 ? label(object(result.missions[0]).objective) : "See --json for Mission details")}`, `Provider: ${label(result.provider, label(latest.provider))}`, `Latest job: ${label(latest.state)}`, `Events observed: ${String(latest.event_count ?? 0)}`, `Last update: ${label(latest.updated_at)}`, ...(latest.error ? [`Error: ${label(object(latest.error).message)}`] : []), "", typeof result.nextStep === "string" ? result.nextStep : ["completed", "failed", "interrupted"].includes(String(latest.state)) ? "Use `npx orbitkeep mission logs` to review the final activity and result." : "The Mission is still running. Use `npx orbitkeep mission logs` to inspect current activity."];
+    return ["✓ Mission status", "", `Objective: ${label(mission.objective, Array.isArray(result.missions) && result.missions.length === 1 ? label(object(result.missions[0]).objective) : "See --json for Mission details")}`, `Provider: ${label(result.provider, label(latest.provider))}`, `Latest job: ${label(latest.state)}`, `Events observed: ${String(latest.event_count ?? 0)}`, `Last activity: ${label(latest.last_activity_at, label(latest.updated_at))}`, ...(latest.pid !== undefined ? [`Provider process: PID ${String(latest.pid)}`] : []), ...(latest.error ? [`Error: ${label(object(latest.error).message)}`] : []), "", typeof result.nextStep === "string" ? result.nextStep : ["completed", "failed", "interrupted"].includes(String(latest.state)) ? "Use `npx orbitkeep mission logs` to review the final activity and result." : "The Mission is still running. Use `npx orbitkeep mission logs` to inspect current activity."];
   }
   return genericSummary("mission", value);
 }
 
 function supervisorSummary(value: unknown): string[] {
   const result = object(value); const supervisor = object(result.supervisor);
-  if (Object.keys(supervisor).length > 0) return [
-    supervisor.running === true ? "✓ Orbitkeep supervisor is running" : "- Orbitkeep supervisor is stopped", "",
-    `Active Missions: ${String(supervisor.activeJobs ?? 0)}`,
-    supervisor.running === true ? "Stop safely with `npx orbitkeep supervisor stop`." : "It will start automatically when an approved Mission begins.",
-  ];
+  if (Object.keys(supervisor).length > 0) {
+    const active = Array.isArray(supervisor.activeMissions) ? supervisor.activeMissions.map(object) : [];
+    const lines = [supervisor.running === true ? "✓ Orbitkeep supervisor is running" : "- Orbitkeep supervisor is stopped", "", ...(supervisor.pid !== undefined ? [`Supervisor process: PID ${String(supervisor.pid)}`] : []), `Active Missions: ${String(supervisor.activeJobs ?? 0)}`];
+    if (active.length) {
+      lines.push("", "Running work");
+      for (const mission of active) {
+        const process = object(mission.process); const work = Array.isArray(mission.currentWork) ? mission.currentWork.map(object) : []; const activity = Array.isArray(mission.activity) ? mission.activity.map(object) : [];
+        lines.push(`- ${label(mission.objective, label(mission.missionId))}`, `  Provider: ${label(mission.provider)} | Flight Director: ${label(process.kind, "manager")} | PID: ${String(process.pid ?? "starting")} | State: ${label(process.state)}`, `  Events: ${String(mission.eventCount ?? 0)} | Last activity: ${label(mission.lastActivityAt)}`);
+        for (const item of work) lines.push(`  Active ${label(item.kind)}: ${label(item.name)}${typeof item.detail === "string" ? ` — ${item.detail}` : ""}`);
+        const latest = activity[0]; if (latest) lines.push(`  Latest: ${label(latest.label)}${typeof latest.detail === "string" ? ` — ${latest.detail}` : ""}`);
+      }
+    }
+    lines.push("", supervisor.running === true ? "Stop safely with `npx orbitkeep supervisor stop`." : "It will start automatically when an approved Mission begins.");
+    return lines;
+  }
   if (result.status === "blocked") return ["! Orbitkeep supervisor remains running", "", `${label(result.code)}`, `Active Missions: ${Array.isArray(result.activeJobs) ? result.activeJobs.length : 0}`, "", "Stop individual Missions first, or use `npx orbitkeep supervisor stop --force`."];
   return [`✓ Orbitkeep supervisor: ${label(result.status, "stopped")}`, "", `${label(result.code, "SUPERVISOR_STOPPED")}`];
 }

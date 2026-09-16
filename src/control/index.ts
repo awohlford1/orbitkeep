@@ -10,6 +10,7 @@ export * from "./sessions.ts";
 export * from "./headless.ts";
 export * from "./flight-plan.ts";
 export * from "./supervisor.ts";
+export * from "./activity.ts";
 
 export type CliProvider = "codex" | "claude";
 export interface ControlledProcess { control_id: string; session_id?: string; provider: CliProvider; pid: number; assignment_id: string; execution_id: string; task_id?: string; started_at: string; command: string; args: string[]; status: "running" | "stopped" | "unknown"; stopped_at?: string; dispatch_response_id?: string; response_capture?: { response_id: string; captured_at: string; truncated: boolean; event_id?: string } }

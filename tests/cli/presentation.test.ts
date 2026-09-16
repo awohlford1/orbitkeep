@@ -78,11 +78,20 @@ test("detached Missions explain background execution and reconnectable logs", ()
   assert.match(launched?.text ?? "", /mission logs/);
   assert.match(launched?.text ?? "", /mission stop --provider codex/);
   assert.match(launched?.text ?? "", /supervisor stop/);
-  const logs = formatCliOutput({ command: "mission", mode: "human", value: { code: "MISSION_LOGS_AVAILABLE", mission: { objective: "Inspect safely" }, job: { state: "completed" }, events: [{ kind: "tool_started", source_type: "Read" }, { kind: "result", data: { result: "Finished safely" } }], result: "Finished safely" } });
+  const logs = formatCliOutput({ command: "mission", mode: "human", value: { code: "MISSION_LOGS_AVAILABLE", mission: { objective: "Inspect safely" }, job: { state: "completed" }, events: [{ kind: "tool_started", source_type: "Read" }, { kind: "result", data: { result: "Finished safely" } }], activity: [{ label: "Read started", detail: "Inspect package manifest", at: "2026-01-01T00:00:00.000Z" }], result: "Finished safely" } });
   assert.match(logs?.text ?? "", /Mission activity loaded/);
-  assert.match(logs?.text ?? "", /Recent activity/);
-  assert.match(logs?.text ?? "", /tool started: Read/i);
+  assert.match(logs?.text ?? "", /Recent meaningful activity/);
+  assert.match(logs?.text ?? "", /Read started: Inspect package manifest/);
   assert.match(logs?.text ?? "", /Finished safely/);
+});
+
+test("supervisor status lists live provider processes and current work", () => {
+  const rendered = formatCliOutput({ command: "supervisor", mode: "human", value: { supervisor: { running: true, pid: 101, activeJobs: 1, activeMissions: [{ missionId: "asn-1", objective: "Inspect repository", provider: "claude", eventCount: 20, lastActivityAt: "2026-01-01T00:00:00.000Z", process: { pid: 202, state: "running", kind: "manager" }, currentWork: [{ kind: "tool", name: "Bash", detail: "Read Jira" }], activity: [{ label: "Agent", detail: "Checking Jira" }] }] } } });
+  assert.match(rendered?.text ?? "", /Supervisor process: PID 101/);
+  assert.match(rendered?.text ?? "", /Inspect repository/);
+  assert.match(rendered?.text ?? "", /PID: 202/);
+  assert.match(rendered?.text ?? "", /Active tool: Bash — Read Jira/);
+  assert.match(rendered?.text ?? "", /Latest: Agent — Checking Jira/);
 });
 
 test("provider doctor has a concise readiness projection", () => {
