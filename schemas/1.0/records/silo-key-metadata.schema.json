@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-workflow.dev/schemas/1.0/records/silo-key-metadata.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "silo_id",
+    "active_key_id",
+    "public_keys",
+    "provider",
+    "protection",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "active_key_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "public_keys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "key_id",
+          "algorithm",
+          "public_key",
+          "fingerprint",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "key_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+          },
+          "algorithm": {
+            "const": "ed25519"
+          },
+          "public_key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fingerprint": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^sha256:[A-Fa-f0-9]{64}$"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "overlap",
+              "retired"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retire_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protection": {
+      "enum": [
+        "hardened",
+        "local_file_degraded",
+        "unavailable"
+      ]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

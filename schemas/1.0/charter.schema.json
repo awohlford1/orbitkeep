@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-workflow.dev/schemas/1.0/charter.schema.json",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "charterId": {
+      "type": "string",
+      "pattern": "^chr-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "issuedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rules": {
+      "type": "object",
+      "properties": {
+        "providers": {
+          "type": "object",
+          "properties": {
+            "allowed": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "denied": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "models": {
+          "type": "object",
+          "properties": {
+            "allowedByRole": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              }
+            }
+          },
+          "required": [
+            "allowedByRole"
+          ],
+          "additionalProperties": false
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "maxInputTokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxOutputTokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxTotalTokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxCostMicros": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxElapsedMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxRuns": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxConcurrentOperations": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "filesystem": {
+          "type": "object",
+          "properties": {
+            "read": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "write": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "read",
+            "write"
+          ],
+          "additionalProperties": false
+        },
+        "network": {
+          "type": "object",
+          "properties": {
+            "allowedHosts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "allowedHosts"
+          ],
+          "additionalProperties": false
+        },
+        "secrets": {
+          "type": "object",
+          "properties": {
+            "allowedReferences": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "allowedReferences"
+          ],
+          "additionalProperties": false
+        },
+        "crew": {
+          "type": "object",
+          "properties": {
+            "allowedRoles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "allowedRoles"
+          ],
+          "additionalProperties": false
+        },
+        "gates": {
+          "type": "object",
+          "properties": {
+            "required": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "required"
+          ],
+          "additionalProperties": false
+        },
+        "clearances": {
+          "type": "object",
+          "properties": {
+            "requiredActions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "requiredActions"
+          ],
+          "additionalProperties": false
+        },
+        "retention": {
+          "type": "object",
+          "properties": {
+            "maxRawResponsesDays": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxClosedAssignmentsDays": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "redaction": {
+          "type": "object",
+          "properties": {
+            "required": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "required"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "charterId",
+    "revision",
+    "issuedAt",
+    "rules"
+  ],
+  "additionalProperties": false
+}

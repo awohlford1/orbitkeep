@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-workflow.dev/schemas/1.0/records/silo-registration-request.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "request_id",
+    "idempotency_id",
+    "silo_id",
+    "silo_instance_id",
+    "public_key",
+    "key_id",
+    "keep_id",
+    "capability_digest",
+    "charter",
+    "issued_at",
+    "expires_at",
+    "nonce"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sreq-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "idempotency_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "silo_instance_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sinst-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "public_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "keep_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^keep-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "colony_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^col-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "capability_digest": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sha256:[A-Fa-f0-9]{64}$"
+    },
+    "charter": {
+      "type": "object",
+      "required": [
+        "schema_version"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "charter_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+        },
+        "digest": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[A-Fa-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nonce": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "additionalProperties": false
+}

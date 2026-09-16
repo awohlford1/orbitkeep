@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-workflow.dev/schemas/1.0/records/route.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "record_id",
+    "record_type",
+    "created_at",
+    "route_id",
+    "assignment_id",
+    "source_task_id",
+    "source_kind",
+    "expected_value",
+    "target_task_id",
+    "effect",
+    "state"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "record_type": {
+      "const": "route"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "route_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^rte-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "assignment_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^asn-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "source_task_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^tsk-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "source_kind": {
+      "enum": [
+        "execution",
+        "task",
+        "gate"
+      ]
+    },
+    "gate_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "expected_value": {
+      "enum": [
+        "completed",
+        "failed",
+        "cancelled",
+        "accepted",
+        "rework",
+        "closed",
+        "skipped",
+        "passed",
+        "waived"
+      ]
+    },
+    "target_task_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^tsk-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "effect": {
+      "enum": [
+        "activate",
+        "skip",
+        "block",
+        "cancel"
+      ]
+    },
+    "state": {
+      "enum": [
+        "pending",
+        "applied"
+      ]
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observed_value": {
+      "enum": [
+        "completed",
+        "failed",
+        "cancelled",
+        "accepted",
+        "rework",
+        "closed",
+        "skipped",
+        "passed",
+        "waived"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "source_kind": {
+            "const": "execution"
+          }
+        },
+        "required": [
+          "source_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "expected_value": {
+            "enum": [
+              "completed",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "observed_value": {
+            "enum": [
+              "completed",
+              "failed",
+              "cancelled"
+            ]
+          }
+        },
+        "not": {
+          "required": [
+            "gate_id"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "source_kind": {
+            "const": "task"
+          }
+        },
+        "required": [
+          "source_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "expected_value": {
+            "enum": [
+              "accepted",
+              "rework",
+              "closed",
+              "cancelled",
+              "skipped"
+            ]
+          },
+          "observed_value": {
+            "enum": [
+              "accepted",
+              "rework",
+              "closed",
+              "cancelled",
+              "skipped"
+            ]
+          }
+        },
+        "not": {
+          "required": [
+            "gate_id"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "source_kind": {
+            "const": "gate"
+          }
+        },
+        "required": [
+          "source_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "gate_id"
+        ],
+        "properties": {
+          "expected_value": {
+            "enum": [
+              "passed",
+              "failed",
+              "waived"
+            ]
+          },
+          "observed_value": {
+            "enum": [
+              "passed",
+              "failed",
+              "waived"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "const": "applied"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "required": [
+          "evaluated_at",
+          "observed_value"
+        ]
+      }
+    }
+  ]
+}

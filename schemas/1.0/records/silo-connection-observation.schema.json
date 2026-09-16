@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-workflow.dev/schemas/1.0/records/silo-connection-observation.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "silo_id",
+    "silo_instance_id",
+    "state",
+    "observed_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "silo_instance_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sinst-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "state": {
+      "enum": [
+        "offline",
+        "connecting",
+        "connected",
+        "disconnected"
+      ]
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "const": "connected"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "required": [
+          "valid_until"
+        ]
+      }
+    }
+  ]
+}

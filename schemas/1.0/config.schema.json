@@ -10,12 +10,15 @@
     "intentLogging",
     "referenceValidation",
     "heartbeat",
+    "supervisor",
     "retention",
     "execution",
     "roles",
     "materiality",
     "models",
     "providers",
+    "integrations",
+    "silo",
     "security"
   ],
   "properties": {
@@ -141,6 +144,19 @@
       },
       "additionalProperties": false
     },
+    "supervisor": {
+      "type": "object",
+      "required": [
+        "idleTimeoutSeconds"
+      ],
+      "properties": {
+        "idleTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
     "retention": {
       "type": "object",
       "required": [
@@ -172,7 +188,8 @@
       "type": "object",
       "required": [
         "defaultInterruptionMode",
-        "automaticForceEscalation"
+        "automaticForceEscalation",
+        "retryPolicy"
       ],
       "properties": {
         "defaultInterruptionMode": {
@@ -183,6 +200,27 @@
         },
         "automaticForceEscalation": {
           "const": false
+        },
+        "retryPolicy": {
+          "type": "object",
+          "required": [
+            "maxAttempts",
+            "backoffSeconds"
+          ],
+          "properties": {
+            "maxAttempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "backoffSeconds": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -313,6 +351,124 @@
         },
         "additionalProperties": false
       }
+    },
+    "integrations": {
+      "type": "object",
+      "required": ["jira"],
+      "properties": {
+        "jira": {
+          "type": "object",
+          "required": ["enabled", "mode", "projectKeys", "workflowProfiles", "scrumAgent"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "mode": { "enum": ["disabled", "observe", "propose", "automatic"] },
+            "siteUrl": { "type": "string", "minLength": 1 },
+            "credentialReference": { "type": "string", "minLength": 1 },
+            "projectKeys": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            },
+            "workflowProfiles": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "projectKey", "issueTypes", "mappings"],
+                "properties": {
+                  "id": { "type": "string", "minLength": 1 },
+                  "projectKey": { "type": "string", "minLength": 1 },
+                  "issueTypes": {
+                    "type": "array",
+                    "items": { "type": "string", "minLength": 1 },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  },
+                  "mappings": {
+                    "type": "object",
+                    "propertyNames": {
+                      "enum": ["work_started", "work_blocked", "work_resumed", "rework_requested", "work_completed", "work_cancelled", "work_paused"]
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "required": ["authority", "fallback"],
+                      "properties": {
+                        "targetStatus": { "type": "string", "minLength": 1 },
+                        "authority": { "enum": ["automatic", "executive", "prohibited"] },
+                        "fallback": { "enum": ["comment_only", "propose", "pending", "fail", "ignore"] }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "scrumAgent": {
+              "type": "object",
+              "required": ["enabled", "progressComments", "progressIntervalMinutes", "timeTracking", "estimateUpdates"],
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "progressComments": { "type": "boolean" },
+                "progressIntervalMinutes": { "type": "integer", "minimum": 1 },
+                "timeTracking": { "enum": ["disabled", "observe", "automatic"] },
+                "estimateUpdates": { "enum": ["disabled", "propose", "automatic"] }
+              },
+              "additionalProperties": false
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "enabled": { "const": false } }, "required": ["enabled"] },
+              "then": { "properties": { "mode": { "const": "disabled" } } }
+            },
+            {
+              "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+              "then": {
+                "required": ["siteUrl", "credentialReference"],
+                "properties": { "mode": { "enum": ["observe", "propose", "automatic"] }, "projectKeys": { "minItems": 1 } }
+              }
+            }
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "silo": {
+      "type": "object",
+      "required": [
+        "credentialProvider",
+        "registration"
+      ],
+      "properties": {
+        "credentialProvider": {
+          "enum": [
+            "none",
+            "local_file_degraded"
+          ]
+        },
+        "registration": {
+          "type": "object",
+          "required": [
+            "required",
+            "trustedAuthorityKeys"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "trustedAuthorityKeys": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
     "security": {
       "type": "object",

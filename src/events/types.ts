@@ -13,6 +13,8 @@ export interface EventInput<T extends JsonValue = JsonValue> {
   task_id?: string;
   execution_id?: string;
   action_id?: string;
+  silo_id?: string;
+  silo_instance_id?: string;
   subject?: { record_type: string; record_id: string; revision?: number };
   caused_by_event_id?: string;
   provider_context?: Readonly<Record<string, JsonValue>>;

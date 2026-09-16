@@ -2,24 +2,40 @@ import type { ActorRef } from "../contracts/actors.ts";
 import type { InterruptionMode } from "../contracts/configuration.ts";
 import type { ApprovalRecord, ExecutionAuthorityRecord } from "../approvals/index.ts";
 import type { MaterialityAssessment } from "../policy/materiality.ts";
+import type { SignedCharter } from "../policy/charter.ts";
 import type { DecisionRecord } from "../approvals/index.ts";
 import type { TaskPacket, TaskPacketInput } from "../workflows/task-packets.ts";
+import type { WorkflowTemplateApplication, WorkflowTemplateBindings, WorkflowTemplateDefinition } from "../workflows/templates.ts";
 
 export type AssignmentState = "planning" | "awaiting_approval" | "running" | "blocked" | "pausing" | "paused" | "handing_over" | "handover_ready" | "cancelling" | "closed";
 export interface PlanState { planId: string; revision: number; purpose: "initial" | "continuation" | "steer"; lifecycle: "draft" | "proposed" | "active" | "superseded"; approach: string[]; acceptanceCriteria: string[]; priorPlanId?: string }
-export interface TaskState { taskId: string; state: "draft" | "ready" | "dispatched" | "running" | "blocked" | "result_submitted" | "rework" | "accepted" | "closed" | "cancelled"; affectedPaths: string[]; executionIds: string[]; resultIds: string[] }
-export interface ExecutionState { executionId: string; taskId: string; attempt: number; state: "ready" | "running" | "completed" | "failed" | "cancelled" | "unknown" }
+export type TaskTerminalDependencyState = "accepted" | "closed";
+export interface TaskDependency { taskId: string; required: boolean; acceptableStates: TaskTerminalDependencyState[] }
+export interface TaskQualityGate { gateId: string; name: string; phase: "pre_dispatch" | "pre_acceptance"; required: boolean; status: "pending" | "passed" | "failed" | "waived"; evidenceIds: string[]; updatedAt?: string }
+export interface RetryPolicy { maxAttempts: number; backoffSeconds: number[] }
+export interface RetryState { status: "available" | "scheduled" | "exhausted"; failedExecutionId: string; nextAttempt: number; nextAttemptAt?: string }
+export type RouteSourceKind = "execution" | "task" | "gate";
+export type RouteEffect = "activate" | "skip" | "block" | "cancel";
+export interface ConditionalRoute { routeId: string; sourceTaskId: string; sourceKind: RouteSourceKind; gateId?: string; expectedValue: string; targetTaskId: string; effect: RouteEffect; state: "pending" | "applied"; createdAt: string; evaluatedAt?: string; observedValue?: string }
+export interface ResourceBudget { inputTokens?: number; outputTokens?: number; totalTokens?: number; costMicros?: number; elapsedMs?: number; maxRuns?: number }
+export interface ResourceUsage { inputTokens: number; outputTokens: number; cachedInputTokens: number; costMicros: number }
+export interface BudgetStatus { state: "active" | "exceeded"; exceededDimensions: Array<keyof ResourceBudget>; assessedAt: string }
+export interface UsageObservation extends ResourceUsage { observationId: string; assignmentId: string; taskId: string; executionId: string; provider: string; model: string; measurement: "observed" | "estimated"; observedAt: string }
+export interface TaskState { taskId: string; state: "draft" | "ready" | "dispatched" | "running" | "blocked" | "result_submitted" | "rework" | "accepted" | "closed" | "cancelled" | "skipped"; role?: string; affectedPaths: string[]; executionIds: string[]; resultIds: string[]; dependencies?: TaskDependency[]; gates?: TaskQualityGate[]; runBudget?: ResourceBudget; retryPolicy?: RetryPolicy; retryState?: RetryState; priority?: number; createdSequence?: number }
+export interface ExecutionState { executionId: string; taskId: string; attempt: number; runKind?: "initial" | "retry" | "rework"; retryAttempt?: number; state: "ready" | "running" | "completed" | "failed" | "cancelled" | "unknown"; startedAt?: string; endedAt?: string; budget?: ResourceBudget; budgetStatus?: BudgetStatus; usage?: ResourceUsage }
 export interface ActionState { actionId: string; taskId?: string; executionId?: string; description: string; state: "requested" | "started" | "succeeded" | "failed" | "prevented" | "cancelled" | "unknown" }
 export interface ResultState { resultId: string; taskId: string; executionId: string; deliveryStatus: "complete" | "partial" | "failed"; summary: string; evidenceIds?: string[] }
 export interface EvidenceState { evidenceId: string; subjectType: "execution" | "result" | "task" | "assignment"; subjectId: string; kind: string; location: string; digest: string; createdAt: string }
 export interface AssessmentState extends MaterialityAssessment { assessmentId: string; createdAt: string; planId: string; planRevision: number }
 export interface AssignmentAggregate {
-  assignmentId: string; objective: string; lifecycle: AssignmentState; executionAuthority: ExecutionAuthorityRecord;
+  assignmentId: string; objective: string; lifecycle: AssignmentState; executionAuthority: ExecutionAuthorityRecord; startedAt?: string; budget?: ResourceBudget; budgetStatus?: BudgetStatus; usage?: ResourceUsage; usageObservations?: UsageObservation[];
   currentPlan: PlanState; plans: PlanState[]; approvals: ApprovalRecord[]; tasks: TaskState[]; executions: ExecutionState[]; results: ResultState[];
   actions: ActionState[]; assessments: AssessmentState[]; decisions: DecisionRecord[]; evidence?: EvidenceState[]; pendingActionIds: string[];
   closureHistory: Array<{ disposition: "completed" | "cancelled"; closedAt: string }>;
   managerInstanceId: string; ownershipLease?: OwnershipLeaseState; nonmaterialChangeCount: number; holds: string[];
   checkpoints?: CheckpointState[]; taskPackets?: TaskPacket[]; handover?: HandoverState;
+  routes?: ConditionalRoute[];
+  templateApplications?: WorkflowTemplateApplication[];
 }
 export interface AssignmentSummary { assignmentId: string; objective: string; lifecycle: AssignmentState; managerInstanceId: string; updatedAt: string }
 export interface OwnershipLeaseState { token: string; managerInstanceId: string; acquiredAt: string; renewedAt: string; expiresAt: string }
@@ -45,9 +61,12 @@ export interface AdapterOperations {
   dispatchTask?(input: { assignmentId: string; taskId: string; executionId: string }): Promise<{ accepted: boolean }>;
 }
 export interface CommandContext { actor: ActorRef; managerInstanceId: string; ownershipToken?: string; now?: () => Date }
+export interface WorkflowCommandServiceOptions { maxConcurrentOperations?: number; centralCharter?: SignedCharter; trustedCharterKeys?: Record<string, string> }
 export interface CommandResponse<T = undefined> { status: "succeeded" | "blocked" | "failed"; code: string; assignment: AssignmentAggregate; data?: T }
 export interface PauseRequest { assignmentId: string; mode?: InterruptionMode; timeoutMs?: number }
 export interface HandoverRequest extends PauseRequest { receiverManagerInstanceId: string }
 export interface SteerRequest { assignmentId: string; paths: string[]; rationale: string; approach: string[]; acceptanceCriteria: string[] }
 export interface TaskCreationInput { affectedPaths: string[]; role?: string }
+export interface TaskSchedulingInput { dependencies?: Array<{ taskId: string; required?: boolean; acceptableStates?: TaskTerminalDependencyState[] }>; gates?: Array<{ gateId: string; name: string; phase: TaskQualityGate["phase"]; required?: boolean }>; runBudget?: ResourceBudget; retryPolicy?: RetryPolicy; priority?: number }
 export interface ExecutionPacketInput extends Omit<TaskPacketInput, "task_id" | "execution_id" | "assignment_id"> {}
+export interface TemplateApplicationInput { applicationId: string; template: WorkflowTemplateDefinition; bindings?: WorkflowTemplateBindings }

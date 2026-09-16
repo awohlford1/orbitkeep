@@ -5,9 +5,14 @@ import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { assertPortableId, writeJsonAtomic, type JsonValue } from "../storage/index.ts";
 import { persistRedactedRawResponse } from "../providers/index.ts";
+import { completeBrokeredSession, createBrokeredSession, markBrokeredSessionRunning } from "./sessions.ts";
+export * from "./sessions.ts";
+export * from "./headless.ts";
+export * from "./flight-plan.ts";
+export * from "./supervisor.ts";
 
 export type CliProvider = "codex" | "claude";
-export interface ControlledProcess { control_id: string; provider: CliProvider; pid: number; assignment_id: string; execution_id: string; task_id?: string; started_at: string; command: string; args: string[]; status: "running" | "stopped" | "unknown"; stopped_at?: string; dispatch_response_id?: string; response_capture?: { response_id: string; captured_at: string; truncated: boolean; event_id?: string } }
+export interface ControlledProcess { control_id: string; session_id?: string; provider: CliProvider; pid: number; assignment_id: string; execution_id: string; task_id?: string; started_at: string; command: string; args: string[]; status: "running" | "stopped" | "unknown"; stopped_at?: string; dispatch_response_id?: string; response_capture?: { response_id: string; captured_at: string; truncated: boolean; event_id?: string } }
 
 const controlPath = (id: string) => path.join("control", "processes", `${assertPortableId(id, "control ID")}.json`);
 const executionPath = (id: string) => path.join("control", "processes", `execution-${assertPortableId(id, "execution ID")}.json`);
@@ -17,8 +22,9 @@ async function write(stateRoot: string, record: ControlledProcess) {
   await writeJsonAtomic(stateRoot, controlPath(record.control_id), record as unknown as JsonValue);
   await writeJsonAtomic(stateRoot, executionPath(record.execution_id), record as unknown as JsonValue);
 }
-export async function launchControlledCli(stateRoot: string, input: { provider: CliProvider; assignmentId: string; executionId: string; taskId?: string; args: string[]; retentionDays?: number }) {
+export async function launchControlledCli(stateRoot: string, input: { provider: CliProvider; assignmentId: string; executionId: string; taskId?: string; args: string[]; managerInstanceId: string; ownershipToken: string; retentionDays?: number }) {
   assertPortableId(input.assignmentId, "assignment ID"); assertPortableId(input.executionId, "execution ID");
+  const brokered = await createBrokeredSession(stateRoot, { provider: input.provider, kind: "specialist", managerInstanceId: input.managerInstanceId, assignmentId: input.assignmentId, ...(input.taskId ? { taskId: input.taskId } : {}), executionId: input.executionId, ownershipToken: input.ownershipToken });
   const controlId = `ctl-${randomUUID()}`;
   const stdoutPath = path.join(stateRoot, "control", "outputs", `${controlId}.stdout.log`);
   const stderrPath = path.join(stateRoot, "control", "outputs", `${controlId}.stderr.log`);
@@ -28,13 +34,21 @@ export async function launchControlledCli(stateRoot: string, input: { provider: 
     : input.args;
   const stdout = openSync(stdoutPath, "a", 0o600); const stderr = openSync(stderrPath, "a", 0o600);
   let child;
-  try { child = spawn(executable(input.provider), effectiveArgs, { detached: true, stdio: ["ignore", stdout, stderr], windowsHide: true, env: process.env }); }
+  try { child = spawn(executable(input.provider), effectiveArgs, { detached: true, stdio: ["ignore", stdout, stderr], windowsHide: true, env: { ...process.env, ...brokered.environment } }); }
   finally { closeSync(stdout); closeSync(stderr); }
+  try {
+    await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
+  } catch (error) {
+    await completeBrokeredSession(stateRoot, brokered.record.control_id, "failed");
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw Object.assign(new Error(`Provider CLI '${executable(input.provider)}' was not found.`), { code: "PROVIDER_CLI_NOT_FOUND" });
+    throw error;
+  }
   child.unref();
-  if (!child.pid) throw new Error("CONTROL_LAUNCH_FAILED: provider CLI did not return a process ID");
+  if (!child.pid) { await completeBrokeredSession(stateRoot, brokered.record.control_id, "failed"); throw new Error("CONTROL_LAUNCH_FAILED: provider CLI did not return a process ID"); }
+  await markBrokeredSessionRunning(stateRoot, brokered.record.control_id, child.pid);
   const dispatchResponseId = `raw-${randomUUID()}`;
   await persistRedactedRawResponse(stateRoot, { responseId: dispatchResponseId, provider: input.provider, sourceEvent: "provider_cli_dispatch", content: { command: executable(input.provider), args: effectiveArgs }, ...(input.retentionDays === undefined ? {} : { retentionDays: input.retentionDays }), assignmentId: input.assignmentId, ...(input.taskId ? { taskId: input.taskId } : {}), executionId: input.executionId });
-  const record: ControlledProcess = { control_id: controlId, provider: input.provider, pid: child.pid, assignment_id: input.assignmentId, execution_id: input.executionId, ...(input.taskId ? { task_id: input.taskId } : {}), started_at: new Date().toISOString(), command: executable(input.provider), args: effectiveArgs, status: "running", dispatch_response_id: dispatchResponseId };
+  const record: ControlledProcess = { control_id: controlId, session_id: brokered.record.control_id, provider: input.provider, pid: child.pid, assignment_id: input.assignmentId, execution_id: input.executionId, ...(input.taskId ? { task_id: input.taskId } : {}), started_at: new Date().toISOString(), command: executable(input.provider), args: effectiveArgs, status: "running", dispatch_response_id: dispatchResponseId };
   await write(stateRoot, record); return record;
 }
 export async function readControlledExecution(stateRoot: string, executionId: string): Promise<ControlledProcess | undefined> {
@@ -64,14 +78,14 @@ async function captureOutput(stateRoot: string, record: ControlledProcess, reten
 export async function interruptControlledExecution(stateRoot: string, executionId: string, mode: "graceful" | "force", timeoutMs = 5_000) {
   const record = await readControlledExecution(stateRoot, executionId);
   if (!record) return { confirmed: false, reason: "CONTROL_NOT_REGISTERED" };
-  if (!alive(record.pid)) { record.status = "stopped"; record.stopped_at ??= new Date().toISOString(); await captureOutput(stateRoot, record); return { confirmed: true }; }
+  if (!alive(record.pid)) { record.status = "stopped"; record.stopped_at ??= new Date().toISOString(); await captureOutput(stateRoot, record); if (record.session_id) await completeBrokeredSession(stateRoot, record.session_id, "stopped"); return { confirmed: true }; }
   try { process.kill(record.pid, mode === "force" ? "SIGKILL" : "SIGTERM"); } catch { return { confirmed: false, reason: "CONTROL_SIGNAL_FAILED" }; }
   const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) { if (!alive(record.pid)) { record.status = "stopped"; record.stopped_at = new Date().toISOString(); await captureOutput(stateRoot, record); await writeJsonAtomic(stateRoot, path.join("control", "receipts", `${record.control_id}-${Date.now()}.json`), { control_id: record.control_id, execution_id: executionId, action: "interrupt", mode, confirmed: true, recorded_at: record.stopped_at }); return { confirmed: true, checkpointId: mode === "graceful" ? `chk-${record.control_id}` : undefined }; } await new Promise(resolve => setTimeout(resolve, 50)); }
+  while (Date.now() < deadline) { if (!alive(record.pid)) { record.status = "stopped"; record.stopped_at = new Date().toISOString(); await captureOutput(stateRoot, record); if (record.session_id) await completeBrokeredSession(stateRoot, record.session_id, "stopped"); await writeJsonAtomic(stateRoot, path.join("control", "receipts", `${record.control_id}-${Date.now()}.json`), { control_id: record.control_id, execution_id: executionId, action: "interrupt", mode, confirmed: true, recorded_at: record.stopped_at }); return { confirmed: true, checkpointId: mode === "graceful" ? `chk-${record.control_id}` : undefined }; } await new Promise(resolve => setTimeout(resolve, 50)); }
   record.status = "unknown"; await write(stateRoot, record); return { confirmed: false, reason: "CONTROL_TIMEOUT" };
 }
 
-export async function controlStatus(stateRoot: string, executionId: string, retentionDays = 7) { const record = await readControlledExecution(stateRoot, executionId); if (!record) return undefined; if (record.status === "running" && !alive(record.pid)) { record.status = "stopped"; record.stopped_at = new Date().toISOString(); await captureOutput(stateRoot, record, retentionDays); } return record; }
+export async function controlStatus(stateRoot: string, executionId: string, retentionDays = 7) { const record = await readControlledExecution(stateRoot, executionId); if (!record) return undefined; if (record.status === "running" && !alive(record.pid)) { record.status = "stopped"; record.stopped_at = new Date().toISOString(); await captureOutput(stateRoot, record, retentionDays); if (record.session_id) await completeBrokeredSession(stateRoot, record.session_id, "stopped"); } return record; }
 /** Marks the one durable timeline event associated with an automatically captured response. */
 export async function markResponseCaptureObserved(stateRoot: string, executionId: string, eventId: string) {
   const record = await readControlledExecution(stateRoot, executionId);

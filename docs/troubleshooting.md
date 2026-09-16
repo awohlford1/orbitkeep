@@ -1,5 +1,27 @@
 # Troubleshooting
 
+## Provider integration is active but the CLI is not found
+
+Orbitkeep can install provider hooks and instructions without installing the
+provider's own CLI. Install and authenticate Claude Code or Codex CLI in the
+same Ubuntu, WSL, macOS, or Windows environment where `npx orbitkeep` runs, then
+rerun `npx orbitkeep doctor`. An `active` integration alone does not mean its
+provider executable is available.
+
+## Claude reports `WORKFLOW_BROKER_SESSION_REQUIRED`
+
+The repository has enforced Claude hooks, but Claude was launched directly or
+the headless broker context was lost. Exit that session and start the Mission
+from the repository root:
+
+```sh
+npx orbitkeep mission start --provider claude
+```
+
+Do not copy assignment IDs, ownership tokens, or broker secrets into a provider
+session manually. Orbitkeep creates the Mission, retains those values, and
+binds them to its headless provider processes.
+
 Start with the health report:
 
 ```sh

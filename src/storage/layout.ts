@@ -3,9 +3,9 @@ import path from "node:path";
 import { storageError } from "./errors.ts";
 
 export const ASSIGNMENT_CATEGORIES = [
-  "assignment", "plans", "checkpoints", "work-items", "tasks", "task-packets",
+  "assignment", "plans", "checkpoints", "work-items", "tasks", "routes", "template-applications", "task-packets",
   "executions", "actions", "results", "assessments", "approvals",
-  "decisions", "evidence",
+  "decisions", "evidence", "usage",
 ] as const;
 
 export const STATE_DIRECTORIES = [
@@ -14,7 +14,9 @@ export const STATE_DIRECTORIES = [
   "validations", "locks/operations", "locks/ownership", "ledger", "archive",
   "cleanup", "legacy", ".runtime/event-receipts",
   "installation-transactions", "migrations",
-  "control/processes", "control/receipts", "control/outputs",
+  "registration",
+  "control/processes", "control/sessions", "control/manager-identities", "control/receipts", "control/outputs",
+  "control/supervisor/jobs", "control/supervisor/outputs",
 ] as const;
 
 const PORTABLE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;

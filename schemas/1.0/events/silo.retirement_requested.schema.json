@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-workflow.dev/schemas/1.0/events/silo.retirement_requested.schema.json",
+  "type": "object",
+  "required": [
+    "silo_id"
+  ],
+  "properties": {
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_ref": {
+      "type": "object",
+      "required": [
+        "record_type",
+        "record_id"
+      ],
+      "properties": {
+        "record_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "record_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object"
+    },
+    "details": {
+      "type": "object"
+    },
+    "silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "silo_instance_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sinst-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "derived_from_silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sreq-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "registration_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sreg-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "capability_digest": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sha256:[A-Fa-f0-9]{64}$"
+    },
+    "state": {
+      "type": "string",
+      "minLength": 1
+    },
+    "health_state": {
+      "enum": [
+        "healthy",
+        "degraded",
+        "blocked"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

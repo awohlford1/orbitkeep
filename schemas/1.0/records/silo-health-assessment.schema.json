@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-workflow.dev/schemas/1.0/records/silo-health-assessment.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "silo_id",
+    "silo_instance_id",
+    "state",
+    "assessed_at",
+    "findings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "silo_instance_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sinst-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "state": {
+      "enum": [
+        "healthy",
+        "degraded",
+        "blocked"
+      ]
+    },
+    "assessed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "level",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "level": {
+            "enum": [
+              "enforced",
+              "observed",
+              "instructed",
+              "unsupported"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -18,9 +18,9 @@ export const planTransitions = {
 } as const;
 
 export const taskTransitions = {
-  draft: ["ready", "cancelled"], ready: ["dispatched", "cancelled"], dispatched: ["running", "cancelled"], running: ["result_submitted", "blocked", "cancelled"],
-  blocked: ["ready", "running", "rework", "cancelled"], result_submitted: ["accepted", "rework", "cancelled"],
-  rework: ["ready", "cancelled"], accepted: ["closed"], closed: [], cancelled: [],
+  draft: ["ready", "blocked", "cancelled", "skipped"], ready: ["dispatched", "blocked", "cancelled", "skipped"], dispatched: ["running", "cancelled"], running: ["result_submitted", "blocked", "cancelled"],
+  blocked: ["ready", "running", "rework", "cancelled", "skipped"], result_submitted: ["accepted", "rework", "cancelled"],
+  rework: ["ready", "cancelled", "skipped"], accepted: ["closed"], closed: [], cancelled: [], skipped: [],
 } as const;
 
 export const executionTransitions = {

@@ -18,5 +18,16 @@ from the consumer's pinned dependency rather than referencing framework source
 inside an incubating repository. Observable raw responses may be persisted only
 through the exported redacting persistence contract.
 
+Start a headless Claude Mission with:
+
+```sh
+npx orbitkeep mission start --provider claude
+```
+
+Orbitkeep first launches a discovery-only planning process, presents the Flight
+Plan in its own terminal, and launches a separately brokered execution process
+only after approval. A bare `claude` launch is not an Orbitkeep Mission and has
+no workflow authorization context.
+
 The template does not promise force interruption, sub-agent resumption, message
 acknowledgement, or live cross-provider process handover.

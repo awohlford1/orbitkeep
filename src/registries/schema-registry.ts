@@ -100,7 +100,8 @@ function conditionalEventReferences(eventType: string): string[] {
   if (eventType.startsWith("task.")) return ["assignment_id", "task_id"];
   if (eventType.startsWith("execution.")) return ["assignment_id", "task_id", "execution_id"];
   if (eventType.startsWith("action.")) return ["assignment_id", "action_id"];
-  if (eventType.startsWith("plan.") || eventType.startsWith("assignment.") || eventType.startsWith("result.") || eventType.startsWith("escalation.")) return ["assignment_id"];
+  if (eventType.startsWith("plan.") || eventType.startsWith("assignment.") || eventType.startsWith("result.") || eventType.startsWith("escalation.") || eventType.startsWith("route.") || eventType.startsWith("template.")) return ["assignment_id"];
+  if (eventType.startsWith("silo.")) return ["silo_id"];
   return [];
 }
 

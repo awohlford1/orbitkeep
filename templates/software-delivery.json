@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1.0",
+  "templateId": "tpl-software-delivery",
+  "version": "1.0.0",
+  "name": "Software delivery",
+  "description": "Implementation followed by parallel security, review, and QA Operations, with a final readiness review and a security-remediation branch.",
+  "operations": [
+    {
+      "key": "implementation",
+      "role": "implementation",
+      "affectedPaths": ["**/*"],
+      "retryPolicy": { "maxAttempts": 2, "backoffSeconds": [5] },
+      "priority": 100
+    },
+    {
+      "key": "security",
+      "role": "security",
+      "affectedPaths": ["**/*"],
+      "dependencies": [{ "operation": "implementation", "acceptableStates": ["accepted", "closed"] }],
+      "gates": [{ "gateId": "security-review", "name": "Security review", "phase": "pre_acceptance" }],
+      "priority": 80
+    },
+    {
+      "key": "review",
+      "role": "reviewer",
+      "affectedPaths": ["**/*"],
+      "dependencies": [{ "operation": "implementation", "acceptableStates": ["accepted", "closed"] }],
+      "gates": [{ "gateId": "code-review", "name": "Code review", "phase": "pre_acceptance" }],
+      "priority": 80
+    },
+    {
+      "key": "qa",
+      "role": "qa",
+      "affectedPaths": ["**/*"],
+      "dependencies": [{ "operation": "implementation", "acceptableStates": ["accepted", "closed"] }],
+      "gates": [{ "gateId": "test-verification", "name": "Test verification", "phase": "pre_acceptance" }],
+      "priority": 80
+    },
+    {
+      "key": "readiness",
+      "role": "reviewer",
+      "affectedPaths": ["**/*"],
+      "dependencies": [
+        { "operation": "security", "acceptableStates": ["accepted", "closed"] },
+        { "operation": "review", "acceptableStates": ["accepted", "closed"] },
+        { "operation": "qa", "acceptableStates": ["accepted", "closed"] }
+      ],
+      "priority": 60
+    },
+    {
+      "key": "security-remediation",
+      "role": "implementation",
+      "affectedPaths": ["**/*"],
+      "priority": 90
+    }
+  ],
+  "routes": [
+    {
+      "key": "security-failure-remediation",
+      "sourceOperation": "security",
+      "sourceKind": "gate",
+      "gateId": "security-review",
+      "expectedValue": "failed",
+      "targetOperation": "security-remediation",
+      "effect": "activate"
+    }
+  ]
+}

@@ -10,6 +10,7 @@
   "intentLogging": { "retryCount": 3, "backoffSeconds": [1, 2, 4] },
   "referenceValidation": { "retrySeconds": [5, 15, 30], "timeoutSeconds": 60 },
   "heartbeat": { "enabled": false, "intervalSeconds": 300 },
+  "supervisor": { "idleTimeoutSeconds": 900 },
   "retention": {
     "rawResponsesDays": 7,
     "closedAssignmentsDays": 30,
@@ -18,7 +19,8 @@
   },
   "execution": {
     "defaultInterruptionMode": "graceful",
-    "automaticForceEscalation": false
+    "automaticForceEscalation": false,
+    "retryPolicy": { "maxAttempts": 1, "backoffSeconds": [] }
   },
   "roles": {
     "enabled": ["implementation", "reviewer", "security", "qa"]
@@ -46,6 +48,25 @@
     "roles": {}
   },
   "providers": {},
+  "integrations": {
+    "jira": {
+      "enabled": false,
+      "mode": "disabled",
+      "projectKeys": [],
+      "workflowProfiles": [],
+      "scrumAgent": {
+        "enabled": false,
+        "progressComments": true,
+        "progressIntervalMinutes": 30,
+        "timeTracking": "disabled",
+        "estimateUpdates": "propose"
+      }
+    }
+  },
+  "silo": {
+    "credentialProvider": "none",
+    "registration": { "required": false, "trustedAuthorityKeys": {} }
+  },
   "security": {
     "stateRootContainment": true,
     "secretRedaction": true,
