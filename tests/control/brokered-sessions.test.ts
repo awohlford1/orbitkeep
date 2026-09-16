@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { bindBrokeredSession, completeBrokeredSession, createBrokeredSession, isBrokeredBootstrapOperation, isBrokeredManagementOperation, isBrokeredReadOnlyOperation, markBrokeredSessionRunning, readBrokeredSession, resolveBrokeredSession, resolveProviderExecutable } from "../../src/control/sessions.ts";
+import { bindBrokeredSession, completeBrokeredSession, createBrokeredSession, isBrokeredBootstrapOperation, isBrokeredManagementOperation, isBrokeredReadOnlyOperation, isParentOwnedLifecycleMutation, markBrokeredSessionRunning, readBrokeredSession, resolveBrokeredSession, resolveProviderExecutable } from "../../src/control/sessions.ts";
 import { installConsumer } from "../../src/installer/index.ts";
 import { initializeStateRoot } from "../../src/storage/index.ts";
 
@@ -83,6 +83,21 @@ test("bootstrap classifier permits read-only discovery and single Orbitkeep comm
   assert.equal(isBrokeredBootstrapOperation({ tool_name: "Read", tool_input: { file_path: ".agent-state/locks/ownership/asn.json" } }), false);
   assert.equal(isBrokeredBootstrapOperation({ tool_name: "Read", tool_input: { file_path: "../outside.txt" } }), false);
   assert.equal(isBrokeredBootstrapOperation({ tool_name: "Glob", tool_input: { pattern: ".agent-state/**" } }), false);
+});
+
+test("a brokered execution worker cannot finalize its parent-owned lifecycle", () => {
+  const session = {
+    schema_version: "1.0", control_id: "ses-test", provider: "codex", kind: "manager",
+    manager_instance_id: "mgr-test", secret_digest: "digest", state: "running",
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    assignment_id: "asn-parent", task_id: "tsk-parent", execution_id: "exe-parent",
+  } as const;
+  assert.equal(isParentOwnedLifecycleMutation(session, "execution-outcome", { executionId: "exe-parent" }), true);
+  assert.equal(isParentOwnedLifecycleMutation(session, "result-submit", { taskId: "tsk-parent" }), true);
+  assert.equal(isParentOwnedLifecycleMutation(session, "close", {}), true);
+  assert.equal(isParentOwnedLifecycleMutation(session, "task-create", {}), false);
+  assert.equal(isParentOwnedLifecycleMutation(session, "execution-outcome", { executionId: "exe-child" }), false);
+  assert.equal(isParentOwnedLifecycleMutation(session, "result-submit", { taskId: "tsk-child" }), false);
 });
 
 test("Claude planner sessions are discovery-only and cannot bootstrap workflow mutations", async () => {

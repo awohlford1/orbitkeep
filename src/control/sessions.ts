@@ -265,3 +265,18 @@ export function isBrokeredReadOnlyOperation(input: Record<string, unknown>, proj
 export function isBrokeredBootstrapOperation(input: Record<string, unknown>, projectRoot?: string): boolean {
   return isBrokeredManagementOperation(input) || isBrokeredReadOnlyOperation(input, projectRoot);
 }
+
+/** Prevents a provider worker from racing the parent supervisor's wrapper lifecycle. */
+export function isParentOwnedLifecycleMutation(
+  session: BrokeredSessionRecord,
+  command: string,
+  input: Record<string, unknown>,
+): boolean {
+  if (!session.assignment_id || !session.task_id || !session.execution_id) return false;
+  if (["start", "resume", "close", "cancel", "reopen", "approve-plan", "reject-plan", "waive-plan"].includes(command)) return true;
+  if (input.executionId === session.execution_id && ["execution-outcome", "execution-retry"].includes(command)) return true;
+  if (input.taskId === session.task_id && [
+    "task-transition", "task-gate", "execution-begin", "result-submit", "result-rework", "result-accept", "task-close",
+  ].includes(command)) return true;
+  return false;
+}

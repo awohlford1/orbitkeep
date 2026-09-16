@@ -13,6 +13,8 @@ test("headless prompts separate planning from approved execution", () => {
   assert.match(flightPlanPrompt("Ship it"), /Do not modify files/);
   assert.match(flightPlanPrompt("Ship it"), /Return only one JSON object/);
   const execution = missionExecutionPrompt({ objective: "Ship it", approach: ["Build"], acceptanceCriteria: ["Tests pass"] });
-  assert.match(execution, /already approved Mission/);
+  assert.match(execution, /already approved Orbitkeep Mission/);
   assert.match(execution, /Do not grant or impersonate Executive approval/);
+  assert.match(execution, /parent Orbitkeep control process already owns/);
+  assert.match(execution, /Do not invoke Orbitkeep workflow or lifecycle commands/);
 });

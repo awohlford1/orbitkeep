@@ -20,7 +20,7 @@ import { ClaudeProviderAdapter } from "../providers/claude/index.ts";
 import { CodexProviderAdapter } from "../providers/codex/index.ts";
 import { persistRedactedRawResponse } from "../providers/index.ts";
 import { quarantineSubmission, readQuarantineSubmission, resolveQuarantine } from "../reconciliation/index.ts";
-import { acknowledgeHandover, bindBrokeredSession, controlStatus, flightPlanPrompt, getProviderManagerIdentity, handoverPackageId, inspectSupervisor, interruptBrokeredSessions, interruptControlledExecution, isBrokeredBootstrapOperation, isBrokeredManagementOperation, isBrokeredReadOnlyOperation, isHandoverAcknowledged, launchControlledCli, launchSupervisorJob, markResponseCaptureObserved, missionExecutionPrompt, parseGeneratedFlightPlan, readSupervisorEvents, resolveBrokeredSession, runHeadlessProvider, serveSupervisor, shutdownSupervisor, supervisorJobs, type BrokeredSessionRecord, type HeadlessProviderEvent, type SessionProvider } from "../control/index.ts";
+import { acknowledgeHandover, bindBrokeredSession, controlStatus, flightPlanPrompt, getProviderManagerIdentity, handoverPackageId, inspectSupervisor, interruptBrokeredSessions, interruptControlledExecution, isBrokeredBootstrapOperation, isBrokeredManagementOperation, isBrokeredReadOnlyOperation, isHandoverAcknowledged, isParentOwnedLifecycleMutation, launchControlledCli, launchSupervisorJob, markResponseCaptureObserved, missionExecutionPrompt, parseGeneratedFlightPlan, readSupervisorEvents, resolveBrokeredSession, runHeadlessProvider, serveSupervisor, shutdownSupervisor, supervisorJobs, type BrokeredSessionRecord, type HeadlessProviderEvent, type SessionProvider } from "../control/index.ts";
 import type { NormalizedProviderSignal } from "../providers/claude/index.ts";
 import { captureGitWorkspaceSnapshot } from "../evidence/index.ts";
 import type { SignedExecutiveApprovalReceipt } from "../approvals/index.ts";
@@ -289,6 +289,9 @@ async function managerCommand(root: string, command: string, input: Input): Prom
   }
   if (brokeredSession && input.actorType === "executive") {
     throw Object.assign(new Error("A managed provider process cannot assert Executive identity."), { code: "EXECUTIVE_CHANNEL_REQUIRED" });
+  }
+  if (brokeredSession && isParentOwnedLifecycleMutation(brokeredSession, command, input)) {
+    throw Object.assign(new Error("The parent Orbitkeep control process owns this Mission wrapper lifecycle. Return work through the provider response instead."), { code: "PARENT_LIFECYCLE_OWNED" });
   }
   if (brokeredSession) input = {
     ...input,

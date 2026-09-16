@@ -16,8 +16,11 @@ instructions.
 - In planning mode, perform discovery only and return the requested structured
   Flight Plan. Do not run workflow mutations or modify repository files.
 - In execution mode, Command Authority has already been established by the
-  parent Orbitkeep process. Use managed commands for canonical Operation, Run,
-  Mission Report, decision, and lifecycle changes. If the binding is absent,
+  parent Orbitkeep process. That parent owns the wrapper Operation, Run,
+  Mission Report, and Mission closure. Do not complete, submit, accept, or
+  close those records from the provider process; perform the approved work and
+  return the report through the provider response. Managed commands may be used
+  only for additional nested Operations and Runs. If the binding is absent,
   stop instead of claiming a lease or inspecting `.agent-state`.
 - Retain the `assignmentId` returned by `start`; internal framework IDs are the
   Flight Director's bookkeeping and must not be requested from the Executive. Keep a

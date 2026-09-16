@@ -12,8 +12,12 @@ approval from inside a provider process. A planning process is discovery-only:
 inspect permitted repository content and return the requested structured Flight
 Plan without running workflow commands or making changes. An execution process
 arrives with an approved Mission and a private broker capability already bound.
-Use the pinned managed CLI only for canonical task, Run, report, decision, and
-lifecycle changes. Never expose broker capabilities or ownership fencing
+The parent Orbitkeep process owns the wrapper Operation, Run, Mission Report,
+and Mission closure: do not complete, submit, accept, or close those records
+from the provider process. Perform the approved work and return its report
+through the provider response. Nested orchestration may use managed commands
+only for additional child Operations and Runs whose identifiers differ from the
+parent-owned wrapper. Never expose broker capabilities or ownership fencing
 tokens.
 
 If the expected Mission binding is absent, stop and report the authorization
