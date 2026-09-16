@@ -2,6 +2,7 @@ import { chmod, mkdir, open, readFile, readdir, rm } from "node:fs/promises";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { createConnection, createServer, type Server } from "node:net";
 import { spawn } from "node:child_process";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { redactRawResponse, persistRedactedRawResponse } from "../providers/raw-responses.ts";
 import { assertContainedStatePath, assertPortableId } from "../storage/layout.ts";
@@ -62,7 +63,10 @@ const jobRelativePath = (jobId: string) => path.join(relativeRoot, "jobs", `${as
 
 function endpointFor(stateRoot: string): string {
   const digest = createHash("sha256").update(path.resolve(stateRoot).toLowerCase()).digest("hex").slice(0, 24);
-  return process.platform === "win32" ? `\\\\.\\pipe\\orbitkeep-${digest}` : path.join(stateRoot, relativeRoot, "orbitkeep.sock");
+  // macOS limits Unix-domain socket paths to roughly 104 bytes. A Silo can
+  // live under an arbitrarily deep checkout, so keep the endpoint short and
+  // bind it to the state root through a collision-resistant digest.
+  return process.platform === "win32" ? `\\\\.\\pipe\\orbitkeep-${digest}` : path.join(tmpdir(), `orbitkeep-${digest}.sock`);
 }
 
 async function readJson<T>(pathname: string): Promise<T | undefined> {
