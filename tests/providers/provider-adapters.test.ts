@@ -185,7 +185,7 @@ test("integration templates are parseable and retain conservative installation d
     "utf8",
   )) as { hooks: Record<string, { hooks: { type: string; command: string }[] }[]> };
   assert.equal(claudeTemplate.hooks.PreToolUse?.[0]?.hooks[0]?.type, "command");
-  assert.match(claudeTemplate.hooks.PreToolUse?.[0]?.hooks[0]?.command ?? "", /agentWorkflowCommand/);
+  assert.equal(claudeTemplate.hooks.PreToolUse?.[0]?.hooks[0]?.command, "{{orbitkeepHookCommand}}");
 
   const codexTemplate = JSON.parse(await readFile(
     new URL("../../integrations/codex/capabilities.template.json", import.meta.url),

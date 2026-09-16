@@ -81,6 +81,11 @@ Orbitkeep
 - **Command Authority:** renewable, fenced ownership of Mission mutations.
 - **Operation:** bounded specialist task within a Mission. The canonical record
   remains a `task`.
+- **Workflow template:** portable, versioned definition of Crew roles,
+  Operations, dependencies, gates, budgets, retries, priority, and conditional
+  routes. Applying one records an immutable template snapshot and digest plus
+  the generated canonical Operation and route bindings. The source template is
+  configuration; the application and generated records are Mission state.
 - **Mission Brief:** compact, versioned task packet supplied to a Mission
   Specialist.
 - **Run:** one execution or rework attempt for an Operation. The canonical
@@ -97,7 +102,7 @@ Orbitkeep
 ## Execution and safety
 
 - **Mission Module:** isolated containerized environment for a Run. Modules are
-  planned for v0.6 and are distinct from Silos: a Silo is a durable workspace;
+  planned for v0.7 and are distinct from Silos: a Silo is a durable workspace;
   a Module is disposable compute.
 - **Ingress Airlock:** validates the Mission Brief, provider, model,
   permissions, inputs, dependencies, and limits before a Module starts.
@@ -115,7 +120,7 @@ Orbitkeep
 - **Black Box:** short-retention, redacted provider request and response
   captures used for diagnosis. It is not the canonical audit ledger.
 - **Preflight:** installation and capability health checks performed by
-  `orbitkeep doctor` and setup validation.
+  `npx orbitkeep doctor` and setup validation.
 - **Mission Archive:** retained records for completed or cancelled Missions.
 
 ## Canonical compatibility

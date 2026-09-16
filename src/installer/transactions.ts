@@ -4,7 +4,7 @@ import path from "node:path";
 import { assertContainedStatePath, initializeStateRoot, writeJsonAtomic } from "../storage/index.ts";
 import type { JsonValue } from "../storage/index.ts";
 
-export type InstallationTransactionKind = "install" | "repair" | "upgrade";
+export type InstallationTransactionKind = "install" | "repair" | "upgrade" | "identity";
 export type InstallationTransactionStatus = "prepared" | "applying" | "committed" | "rolling_back" | "rolled_back" | "failed";
 
 export interface TransactionEntry {

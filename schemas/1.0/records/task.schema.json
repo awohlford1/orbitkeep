@@ -55,8 +55,14 @@
         "rework",
         "accepted",
         "closed",
-        "cancelled"
+        "cancelled",
+        "skipped"
       ]
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
     },
     "affected_paths": {
       "type": "array",
@@ -83,6 +89,206 @@
         "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
       },
       "uniqueItems": true
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "task_id",
+          "required",
+          "acceptable_states"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^tsk-[A-Za-z0-9][A-Za-z0-9._-]*$"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "acceptable_states": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "accepted",
+                "closed"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "gate_id",
+          "name",
+          "phase",
+          "required",
+          "status",
+          "evidence_ids"
+        ],
+        "properties": {
+          "gate_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phase": {
+            "enum": [
+              "pre_dispatch",
+              "pre_acceptance"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "passed",
+              "failed",
+              "waived"
+            ]
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^evd-[A-Za-z0-9][A-Za-z0-9._-]*$"
+            },
+            "uniqueItems": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "run_budget": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "inputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "costMicros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxRuns": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "retry_policy": {
+      "type": "object",
+      "required": [
+        "maxAttempts",
+        "backoffSeconds"
+      ],
+      "properties": {
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "backoffSeconds": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "retry_state": {
+      "type": "object",
+      "required": [
+        "status",
+        "failedExecutionId",
+        "nextAttempt"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "available",
+            "scheduled",
+            "exhausted"
+          ]
+        },
+        "failedExecutionId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^exe-[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "nextAttempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "nextAttemptAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "scheduled"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "nextAttemptAt"
+            ]
+          }
+        }
+      ]
+    },
+    "priority": {
+      "type": "integer"
+    },
+    "created_sequence": {
+      "type": "integer",
+      "minimum": 1
     }
   },
   "additionalProperties": false

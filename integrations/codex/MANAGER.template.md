@@ -4,12 +4,24 @@ This file is an installation template. The installer adds a concise reference
 to the consuming project's Flight Director instructions without replacing existing
 instructions.
 
-- Invoke the pinned `orbitkeep` command for every canonical state change.
+- Invoke the pinned `npx --no-install orbitkeep` command for every canonical state change.
 - Pass each command's structured input as one JSON object on standard input.
   Invoke managed commands with `--json` so responses remain machine-readable
   even when the provider allocates an interactive terminal.
   Never invoke `start` without `objective`, `approach`, and
   `acceptanceCriteria`.
+- Orbitkeep starts this Flight Director headlessly and supplies its stable
+  manager identity and Mission binding. Do not launch a provider, create the
+  parent Mission, invent an identity, or grant Executive approval.
+- In planning mode, perform discovery only and return the requested structured
+  Flight Plan. Do not run workflow mutations or modify repository files.
+- In execution mode, Command Authority has already been established by the
+  parent Orbitkeep process. That parent owns the wrapper Operation, Run,
+  Mission Report, and Mission closure. Do not complete, submit, accept, or
+  close those records from the provider process; perform the approved work and
+  return the report through the provider response. Managed commands may be used
+  only for additional nested Operations and Runs. If the binding is absent,
+  stop instead of claiming a lease or inspecting `.agent-state`.
 - Retain the `assignmentId` returned by `start`; internal framework IDs are the
   Flight Director's bookkeeping and must not be requested from the Executive. Keep a
   stable `managerInstanceId` across session restart so canonical state can be
@@ -23,6 +35,30 @@ instructions.
   ID mapping internally. Explicit IDs remain an optional advanced override.
 - Use `start`, `resume`, `status`, `ask`, `steer`, `pause`, and `handover` with
   the semantics returned by the shared runtime.
+- Declare Operation dependencies, priority, quality gates, and any per-Run
+  `runBudget` in `task-create`; declare a Mission `budget` at `start`. Record
+  provider metrics through `usage-record`, including observed-or-estimated
+  provenance and cost in integer micro-units.
+  Record gate outcomes with `task-gate`; never infer a pass from prose. Respect
+  scheduler eligibility and configured concurrency. Cancel through the managed
+  task transition so required downstream Operations and active Runs are handled
+  by Orbitkeep Core.
+- Treat exact budget exhaustion as a block on new Runs. Treat an overrun as a
+  Mission hold; do not invent model pricing or omit estimated usage.
+- Retry only the latest concretely failed Run through `execution-retry`, and
+  respect its persisted not-before time. Never treat cancellation, an unknown
+  outcome, or generic task transition as retry authority. Mission Report rework
+  is a separate lifecycle and starts a new retry cycle.
+- Create conditional branches through `route-create` and evaluate them through
+  `route-evaluate`. A route may read only a concrete latest Run outcome,
+  terminal Operation outcome, or recorded gate outcome. An unknown or
+  nonterminal source is never branch authority. Only a route may mark an
+  Operation `skipped`; active Runs require the explicit cancellation workflow.
+- Apply reusable workflows through `template-apply` with a new stable `tapp-`
+  application ID. Retain the returned Operation bindings, do not alter the
+  immutable template snapshot, and only supply declared `affectedPaths`
+  bindings. Template Crew roles must be enabled and cannot be replaced at
+  dispatch; provider and model selection still occurs under runtime policy.
 - Record an Executive decision with `approve-plan`, `reject-plan`, or
   `waive-plan` for the exact returned `approvalId`. In `signed_ed25519` mode,
   pass the externally signed `approvalReceipt`; never treat `actorType` as

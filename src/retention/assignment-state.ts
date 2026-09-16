@@ -64,6 +64,7 @@ function collectDirectReferences(record: StoredRecord, output: HoldTarget[]): vo
   const singular: Record<string, string> = {
     current_plan_id: "plan", prior_plan_id: "plan", task_id: "task", parent_task_id: "task",
     execution_id: "execution", result_id: "result", action_id: "action", checkpoint_id: "checkpoint",
+    source_task_id: "task", target_task_id: "task",
   };
   const plural: Record<string, string> = {
     task_ids: "task", execution_ids: "execution", result_ids: "result",
@@ -76,6 +77,10 @@ function collectDirectReferences(record: StoredRecord, output: HoldTarget[]): vo
   for (const [field, recordType] of Object.entries(plural)) {
     const values = record[field];
     if (Array.isArray(values)) for (const value of values) if (typeof value === "string") output.push({ record_type: recordType, record_id: value });
+  }
+  for (const [field, recordType] of [["operation_bindings", "task"], ["route_bindings", "route"]] as const) {
+    const values = record[field];
+    if (values !== null && typeof values === "object" && !Array.isArray(values)) for (const value of Object.values(values)) if (typeof value === "string") output.push({ record_type: recordType, record_id: value });
   }
 }
 

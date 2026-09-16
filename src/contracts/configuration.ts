@@ -1,8 +1,28 @@
+import type { JiraIntegrationMode, JiraWorkflowProfile } from "../integrations/jira/types.ts";
+
 export type ApprovalRequirement = "required" | "not_required";
 export type InterruptionMode = "graceful" | "force";
 export type AmbiguityBehavior = "hold_affected_work";
 export type ModelFallbackPolicy = "require_authorization" | "reject";
 export type ProviderRequiredMode = "off" | "instructions" | "observed" | "enforced" | "brokered";
+
+export interface JiraScrumAgentConfiguration {
+  enabled: boolean;
+  progressComments: boolean;
+  progressIntervalMinutes: number;
+  timeTracking: "disabled" | "observe" | "automatic";
+  estimateUpdates: "disabled" | "propose" | "automatic";
+}
+
+export interface JiraIntegrationConfiguration {
+  enabled: boolean;
+  mode: JiraIntegrationMode;
+  siteUrl?: string;
+  credentialReference?: string;
+  projectKeys: string[];
+  workflowProfiles: JiraWorkflowProfile[];
+  scrumAgent: JiraScrumAgentConfiguration;
+}
 
 export interface FrameworkConfiguration {
   schemaVersion: "1.0";
@@ -16,6 +36,7 @@ export interface FrameworkConfiguration {
   intentLogging: { retryCount: number; backoffSeconds: number[] };
   referenceValidation: { retrySeconds: number[]; timeoutSeconds: number };
   heartbeat: { enabled: boolean; intervalSeconds: number };
+  supervisor: { idleTimeoutSeconds: number };
   retention: {
     rawResponsesDays: number;
     closedAssignmentsDays: number;
@@ -25,6 +46,7 @@ export interface FrameworkConfiguration {
   execution: {
     defaultInterruptionMode: InterruptionMode;
     automaticForceEscalation: false;
+    retryPolicy: { maxAttempts: number; backoffSeconds: number[] };
   };
   roles: { enabled: string[] };
   materiality: {
@@ -43,6 +65,11 @@ export interface FrameworkConfiguration {
     requiredMode?: ProviderRequiredMode;
     captureRawResponses?: boolean;
   }>;
+  integrations: { jira: JiraIntegrationConfiguration };
+  silo: {
+    credentialProvider: "none" | "local_file_degraded";
+    registration: { required: boolean; trustedAuthorityKeys: Record<string, string> };
+  };
   security: {
     stateRootContainment: true;
     secretRedaction: true;

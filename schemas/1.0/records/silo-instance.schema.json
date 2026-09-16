@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-workflow.dev/schemas/1.0/records/silo-instance.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "silo_instance_id",
+    "silo_id",
+    "created_at",
+    "last_started_at",
+    "instance_version",
+    "workspace_fingerprint"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "silo_instance_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sinst-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "instance_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "workspace_fingerprint": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sha256:[A-Fa-f0-9]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

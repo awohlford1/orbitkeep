@@ -96,14 +96,28 @@ export async function acquireOperationLock(options: AcquireLockOptions): Promise
       expiresAt: new Date(acquiredAt.getTime() + leaseMs).toISOString(),
       path: lockPath,
     };
+    let directoryCreated = false;
     try {
       await mkdir(lockPath);
+      directoryCreated = true;
       await writeFile(path.join(lockPath, "lock.json"), `${JSON.stringify(lock)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
       return lock;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (directoryCreated) {
         await rm(lockPath, { recursive: true, force: true }).catch(() => undefined);
+      }
+      // Windows can report EPERM/EACCES instead of EEXIST while another
+      // contender creates, reads, or removes the lock directory. Treat those
+      // errors as transient contention, but never remove a directory this
+      // attempt did not create because it may contain the current owner's lock.
+      if (!["EEXIST", "EPERM", "EACCES"].includes(code ?? "")) {
         throw error;
+      }
+      if (code !== "EEXIST") {
+        if (Date.now() - started >= timeoutMs) throw storageError("LOCK_TIMEOUT", `Timed out acquiring lock: ${options.resource}`);
+        await delay(options.retryMs ?? 10);
+        continue;
       }
       const existing = await readLock(lockPath);
       if (existing !== undefined && Date.parse(existing.expiresAt) <= now().getTime()) {

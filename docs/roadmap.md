@@ -5,7 +5,7 @@ Orbitkeep platform. Release boundaries are capability gates, not dates. A phase
 is complete only when its behavior, failure modes, recovery, and evidence are
 validated on supported platforms.
 
-Orbitkeep v0.4.2 is a local-first developer preview and CLI MVP. The framework
+Orbitkeep v0.5.0 is the active development line for a local-first developer preview. The framework
 must not be represented as a distributed, isolated, multi-user platform until
 the applicable later release gates are satisfied. The detailed product and
 delivery model is maintained in [product-plan.md](product-plan.md).
@@ -52,35 +52,134 @@ Exit criteria:
 - v0.4.1 installations upgrade transactionally without rewriting canonical
   workflow history.
 
-## v0.5 — Silo and workflow foundations
+## v0.5 — Silo, workflow, and headless execution foundations
+
+The first focused design is the
+[Silo identity and lifecycle specification](https://github.com/awohlford1/orbitkeep/blob/main/docs/specifications/v0.5-silo-identity-lifecycle.md).
+The release-stabilization design is the
+[session broker and release integrity specification](https://github.com/awohlford1/orbitkeep/blob/main/docs/specifications/v0.5-session-broker-release-integrity.md).
+The workflow-engine design is the
+[v0.5 workflow engine specification](https://github.com/awohlford1/orbitkeep/blob/main/docs/specifications/v0.5-workflow-engine.md).
+The manager execution design is the
+[v0.5 Flight Director orchestration specification](specifications/v0.5-flight-director-orchestration.md).
+
+Stabilization work completed or begun at the start of this release:
+
+- Brokered interactive Claude and Codex session launch with stable provider
+  manager identities.
+- Fail-closed Claude authorization for direct sessions and restricted,
+  secret-bound bootstrap access for brokered sessions.
+- Automatic binding of a brokered session to its Mission ownership lease after
+  `start`, `resume`, or ownership recovery.
+- Local-install command guidance consistently uses `npx orbitkeep`.
+- Publish preflight rejects dirty working trees, and package contents exclude
+  uncommitted specifications.
+
+Live UAT demonstrated that launching users into provider-owned interfaces does
+not provide a reliable Orbitkeep workflow or Executive authorization boundary.
+Orbitkeep therefore must not publish v0.5 with interactive provider launch as
+its primary Mission path. Headless provider execution and a minimal
+Orbitkeep-owned streaming CLI are v0.5 release blockers. Headless execution
+must run a persistent Flight Director that dynamically manages governed Crew;
+a single generic provider worker performing the whole Mission is not a
+conforming substitute.
 
 Scope:
 
 - Add durable Silo identity and optional Keep and Colony membership metadata.
 - Define Silo registration, capability, health, key-rotation, disconnection,
   degradation, blocking, and retirement states.
-- Add `silo status`, `silo register`, and `silo disconnect` operations without
-  making registration a prerequisite for local use.
-- Implement Operation dependency graphs, deterministic eligibility scheduling,
-  parallel and sequential execution, required and optional quality gates,
-  cancellation propagation, and conditional routing based on validated
-  outcomes.
-- Add Mission and Run token, cost, time, and concurrency budgets. Keep
-  retry policy distinct from result rework.
-- Add reusable, versioned workflow templates.
-- Emit provider-neutral usage observations suitable for later Telemetry.
-- Define Relay envelopes, ordering, idempotency, authentication, and replay
-  boundaries, then implement an in-memory reference transport without
-  requiring a central service for local operation.
-- Implement a Charter policy engine covering providers, models, resources,
-  filesystem, network, secrets, Crew, gates, Clearances, consequential actions,
-  retention, and redaction.
-- Define central Charter versus Local Charter precedence, signature, rotation,
-  and failure rules.
-- Establish the public SDK/API boundary used by the CLI and future platform
-  clients.
-- Qualify Windows, macOS, and Linux across clean, partial, malformed,
-  customized, legacy, single-provider, and dual-provider installations.
+- Add `silo status` and the transport-neutral registration SDK without making
+  registration a prerequisite for local use. Keep the public registration and
+  disconnect CLI commands reserved until a persistent authenticated Keep
+  adapter exists; the in-memory adapter is for contract and UAT tests only.
+- Operation dependency graphs, deterministic eligibility scheduling, parallel
+  and sequential execution, required and optional quality gates, cancellation
+  propagation, and conditional routing based on validated outcomes are
+  implemented.
+- Mission and Run token, cost, time, and concurrency budgets are implemented.
+  Bounded retry policy is implemented with a new Run per retry and remains
+  distinct from Mission Report rework.
+- Reusable, versioned workflow templates now expand atomically into canonical
+  scheduling and routing records with immutable provenance, portable aliases,
+  path bindings, Crew-role enforcement, and an authoring schema.
+- Provider-neutral usage observations are emitted and persisted for later
+  Telemetry.
+- Relay envelopes, strict per-stream ordering, retained-message idempotency,
+  Ed25519 authentication, bounded replay, a public schema, and an in-memory
+  reference transport are implemented without requiring a central service for
+  local operation. Durable network transport remains v0.8 scope.
+- The Charter SDK now covers providers, models, resources, filesystem, network,
+  secrets, Crew, gates, Clearances, retention, and redaction, and is enforced at
+  managed Run dispatch.
+- Central and Local Charter intersection, Ed25519 trust, monotonic revision,
+  key-rotation overlap, expiry, conflict, rollback, and failure rules are
+  defined and tested. Durable Keep-delivered Charter storage remains future
+  integration work.
+- The public SDK/API boundary used by the CLI and future platform clients is
+  explicit, documented, packed-consumer tested, and restricted by package
+  exports.
+- Add headless Claude and Codex Docking Adapters that stream structured
+  provider output without placing the user inside either provider interface.
+- Run the selected provider as a persistent Flight Director after approval,
+  not as a generic implementation worker. The Flight Director interprets the
+  human-readable Flight Plan, chooses configured specialist roles and models
+  as needs emerge, supervises results and rework, owns integration and the
+  merge lane, and reserves its own execution for economical one-off work.
+- Add a brokered, provider-neutral Crew dispatch channel. The Flight Director
+  submits a dispatch request without receiving workflow credentials; Orbitkeep
+  validates scope, role, model, permissions, gates, budget, dependencies, and
+  concurrency against the active Flight Plan and Charter before atomically
+  creating the Operation, Run, and Mission Brief and launching the specialist.
+- Return each Mission Specialist report to the same Flight Director loop. The
+  manager may accept it for integration, request bounded rework, dispatch
+  further review, ask the Executive a side question, or escalate a material
+  Course Correction. A provider process cannot mutate canonical state or
+  approve its own expansion of authority.
+- Add the provider-neutral public Mission commands `mission start`, `mission
+  resume`, `mission status`, `mission logs`, `mission accept`, `mission ask`, `mission steer`, `mission pause`,
+  `mission handover`, `mission stop`, and `mission cancel`, with provider selection treated as
+  configuration or an option rather than a separate workflow.
+- Make Orbitkeep own Flight Plan presentation and Executive Clearance through
+  a control channel unavailable to managed provider processes. Provider
+  output and provider-supplied actor metadata are not authorization.
+- Stream a minimum normalized activity feed covering provider messages, Crew
+  dispatch, tool and command execution, results, failures, and usage while
+  retaining redacted raw events only for configured diagnostic retention.
+- Follow that activity automatically in interactive terminals after Mission
+  launch. `Ctrl+C` detaches the viewer without stopping the Mission,
+  `--detach` opts out at launch, and `mission watch` reconnects later. Scripts,
+  redirected output, and `--json` remain non-blocking and detached.
+- Replace provider-envelope planning labels such as `assistant` and `user`
+  with semantic tool, command, process, and message activity. Protocol roles
+  are transport metadata and must not be shown as participant identities.
+- Present four Flight Plan choices before execution: approve, revise/steer,
+  reject, or later. Steering creates and displays a new proposed plan revision
+  from the Executive's instruction, leaves Command Authority unauthorized, and
+  may repeat until a terminal decision is made.
+- Add a provider-neutral active Crew roster to `mission watch` and `supervisor
+  status`. Canonical Orbitkeep dispatches show Crew role, Operation, Run,
+  selected model, lifecycle, and timing; provider-internal tasks remain clearly
+  labeled observations when no canonical Crew mapping exists. The roster must
+  reconcile terminal outcomes across detach, reconnect, and supervisor restart.
+- Run approved provider execution beneath an authenticated per-Silo local
+  supervisor so terminal exit only disconnects the user. Persist job state and
+  normalized redacted activity for later status and log replay. Automatic OS
+  login startup and reboot recovery remain post-v0.5 hardening work.
+- Retire `session launch --provider ...` from the public interface. Remove it
+  from normal help and documentation, prevent it from launching a provider,
+  and retain only a temporary `COMMAND_RETIRED` compatibility response that
+  directs users to `mission start --provider ...`.
+- Separate the CLI into a human Mission surface, stable `--json` automation,
+  provider diagnostics, and internal Core mutation operations. Low-level
+  assignment IDs, fencing tokens, ownership acquisition, raw plan-approval
+  commands, and reconciliation commands are not part of the normal user UX.
+- Add `provider doctor` diagnostics for Claude and Codex installation,
+  authentication, headless execution, event streaming, and permission support.
+- Windows, macOS, and Linux qualification runs through a required CI matrix
+  across clean, partial, malformed, customized, legacy, single-provider, and
+  dual-provider installation coverage. The exact release-candidate evidence
+  remains pending until all three jobs pass.
 
 Exit criteria:
 
@@ -94,11 +193,73 @@ Exit criteria:
 - Effective policy is the intersection of central limits and local
   restrictions; local policy cannot silently expand authority.
 - Relay and Charter contracts have adversarial and offline-behavior tests.
+- A user can plan, approve, execute, observe, steer, pause, resume, and finish
+  a basic Mission through Orbitkeep without entering a provider interface.
+- An approved Mission remains under a durable Flight Director loop. The
+  manager dynamically invokes appropriate configured Crew without requiring
+  the Flight Plan to preassign roles, receives their reports, controls rework
+  and integration, owns the merge lane, and escalates material decisions to
+  the Executive.
+- Every specialist invocation has a validated canonical Mission Brief and
+  Operation/Run identity before provider launch. Provider-native sub-agents
+  that bypass the dispatch channel are not represented as governed Crew and
+  cannot receive additional authority from their mere existence.
+- Planning progress identifies meaningful actions rather than provider protocol
+  roles, and tool results are never mislabeled as new Executive input.
+- An Executive can revise a proposed Flight Plan before approval without
+  starting work, exposing internal IDs, or using low-level workflow commands.
+- A user can identify which Crew are running, what Operation each owns, which
+  model was selected, and whether each Run completed, failed, or was
+  interrupted. Reconnection must not leave terminal Crew falsely active.
+- Managed provider processes cannot grant their own Executive Clearance or
+  reach an equivalent approval capability through the public CLI.
+- Claude and Codex pass the same basic headless Mission UAT, including event
+  capture, manager-selected multi-Crew dispatch, specialist result return,
+  rework, integration, automatic final result submission, explicit
+  parent-channel acceptance, failure, and cleanup. A provider cannot accept
+  its own final Mission Report or expand its own authority.
+- Retired commands fail clearly and safely, and public help does not advertise
+  provider sessions or internal workflow mutation commands as user workflows.
 - No central component is treated as authoritative for local state it has not
   durably acknowledged.
 - The supported-platform qualification suite passes.
 
-## v0.6 — Mission Modules and Airlocks
+Release evidence is tracked in
+[release-qualification.md](release-qualification.md); configured automation is
+not treated as a passing platform result before it runs on the candidate SHA.
+
+## v0.6 — Terminal Mission Control TUI and supervisor hardening
+
+Scope:
+
+- Expand the v0.5 streaming Mission CLI into a full-screen interactive terminal
+  Mission Control TUI with live Crew activity,
+  tool and command execution, file changes, Run state, Airlock requests,
+  Mission Reports, and estimated usage Telemetry.
+- Harden the v0.5 local supervisor for multiple concurrent Missions with
+  multi-pane monitoring, bounded replay, daemon crash reconciliation, optional
+  OS login startup, and reboot recovery without transferring live provider
+  control.
+- Expand provider tool-permission requests into richer Orbitkeep Airlocks with
+  a consistent approve-once, approve-for-Mission, reject, and request-
+  justification experience.
+- Add Mission and Crew filtering, Flight Recorder exploration, result and
+  artifact inspection, advanced Telemetry, and accessible keyboard controls.
+- Complete removal of the temporary `session launch` compatibility tombstone
+  after the documented pre-1.0 migration window.
+
+Exit criteria:
+
+- Live activity and replay show ordered, attributable Crew, tool, command,
+  result, failure, and usage events without exposing secrets or hidden model
+  reasoning.
+- Graceful and forced pause and handover have observed, tested outcomes.
+- Claude and Codex pass the same provider-neutral Mission UAT suite, with any
+  unavoidable capability differences reported explicitly.
+- Concurrent, detached, resumed, interrupted, malformed-stream, and supervisor
+  recovery paths are tested on every supported host platform.
+
+## v0.7 — Mission Modules and Airlocks
 
 Scope:
 
@@ -117,7 +278,7 @@ Exit criteria:
 - Interrupted Modules are recoverable or resolve to an explicit unknown state.
 - Secrets and raw responses follow configured redaction and retention policy.
 
-## v0.7 — Relay and federated Silos
+## v0.8 — Relay and federated Silos
 
 Scope:
 
@@ -142,24 +303,32 @@ Exit criteria:
 - Reconnection reconciles explicit state rather than applying last-writer wins.
 - Central and local audit records retain verifiable provenance.
 
-## v0.8 — Mission Control and Telemetry
+## v0.9 — Graphical Mission Control and Telemetry
 
 Scope:
 
-- Deliver Mission Control for Keep, Colony, Silo, Mission, Crew, Clearance,
-  Airlock, and health management.
-- Add live Mission and Run views with Flight Recorder drill-down.
+- Deliver the graphical Mission Control client for Keep, Colony, Silo,
+  Mission, Crew, Clearance, Airlock, and health management.
+- Add live Mission and Run views with Crew activity, Flight Plan, result,
+  artifact, file-change, and Flight Recorder drill-down.
+- Provide graphical Airlock decisions, side questions, Course Corrections,
+  graceful and forced pause, resume, handover, and cancellation over the same
+  Core APIs and authorization boundaries as the CLI.
 - Add Telemetry for tokens, cost, duration, throughput, rework, failures,
   provider/model performance, and Airlock outcomes.
 - Provide human Go/No-Go and Course Correction workflows without allowing the
   UI to bypass Orbitkeep Core.
 - Add alerting and operational dashboards for disconnected or unhealthy Silos.
+- Preserve the CLI as a first-class interface for local development, SSH,
+  automation, recovery, and accessibility.
 
 Exit criteria:
 
 - Every displayed decision and state links to its authoritative source.
 - Telemetry distinguishes observed measurements from estimates.
 - UI authorization is tested independently from workflow authorization.
+- Equivalent CLI and graphical actions produce the same canonical transitions
+  and Flight Recorder evidence.
 - Accessibility, recovery, and destructive-action safeguards are validated.
 
 ## v1.0 — Production control plane
@@ -196,6 +365,9 @@ Every applicable release is tested across:
 - Windows, macOS, and Linux.
 - Clean, partial, malformed, customized, and legacy installations.
 - Claude-only, Codex-only, and dual-provider configurations.
+- Headless provider streams, malformed or interrupted events, provider
+  questions, tool-permission requests, and detach/reattach behavior once the
+  provider control plane is implemented.
 - Provider interruption, unavailable-provider, and prohibited-substitution
   behavior.
 - Concurrent Missions, competing Flight Directors, expired leases, and
@@ -226,6 +398,10 @@ The following are release requirements, not deferred documentation exercises:
 ## Cross-cutting rules
 
 - Mission Control is a client of Orbitkeep Core, not a privileged bypass.
+- The CLI and graphical Mission Control are equal clients of the same Core
+  contracts; neither owns separate workflow truth.
+- Provider interfaces are optional diagnostic surfaces. Orbitkeep owns the
+  supported Mission experience and treats provider output as untrusted.
 - Relay transports messages; it does not become canonical workflow state.
 - Flight Recorder stores authoritative history; Telemetry is derived analysis.
 - A Silo owns local execution truth and never claims an unobserved outcome.

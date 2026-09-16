@@ -36,8 +36,11 @@ export async function generateRoles(projectRoot = defaultProjectRoot, check = fa
     for (const [relative, expected] of [[path.join(".claude", "agents", `${role.id}.md`), renderClaude(role)], [path.join(".codex", "agents", `${role.id}.toml`), renderCodex(role)]] as const) {
       const filename = path.join(projectRoot, relative);
       const current = await readFile(filename, "utf8").catch(() => undefined);
-      if (current !== expected) mismatches.push(relative.split(path.sep).join("/"));
-      if (!check && current !== expected) { await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, expected, "utf8"); }
+      // Git may materialize committed role files with CRLF on Windows. Role
+      // conformance concerns content, not the checkout's native line ending.
+      const contentMatches = current?.replaceAll("\r\n", "\n") === expected.replaceAll("\r\n", "\n");
+      if (!contentMatches) mismatches.push(relative.split(path.sep).join("/"));
+      if (!check && !contentMatches) { await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, expected, "utf8"); }
     }
   }
   return { valid: mismatches.length === 0, mismatches };

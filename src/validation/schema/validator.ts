@@ -19,6 +19,11 @@ function ptr(path: string, key: string | number): string {
 
 function visit(schema: JsonSchema, value: unknown, path: string, schemaPath: string, errors: SchemaIssue[]): void {
   if (Array.isArray(schema.allOf)) for (let i = 0; i < schema.allOf.length; i++) visit(schema.allOf[i] as JsonSchema, value, path, `${schemaPath}/allOf/${i}`, errors);
+  if (schema.not && typeof schema.not === "object") {
+    const local: SchemaIssue[] = [];
+    visit(schema.not as JsonSchema, value, path, `${schemaPath}/not`, local);
+    if (local.length === 0) issue(errors, "SCHEMA_CONSTRAINT", "Value matches a forbidden shape.", path, `${schemaPath}/not`);
+  }
   if (Array.isArray(schema.oneOf)) {
     const matches = schema.oneOf.filter((candidate) => { const local: SchemaIssue[] = []; visit(candidate as JsonSchema, value, path, schemaPath, local); return local.length === 0; });
     if (matches.length !== 1) issue(errors, "SCHEMA_CONSTRAINT", "Value must match exactly one allowed shape.", path, `${schemaPath}/oneOf`);
@@ -33,6 +38,8 @@ function visit(schema: JsonSchema, value: unknown, path: string, schemaPath: str
   }
   if (typeof value === "number" && typeof schema.minimum === "number" && value < schema.minimum) issue(errors, "SCHEMA_CONSTRAINT", `Number must be >= ${schema.minimum}.`, path, `${schemaPath}/minimum`);
   if (Array.isArray(value)) {
+    if (typeof schema.minItems === "number" && value.length < schema.minItems) issue(errors, "SCHEMA_CONSTRAINT", `Array must contain at least ${schema.minItems} items.`, path, `${schemaPath}/minItems`);
+    if (typeof schema.maxItems === "number" && value.length > schema.maxItems) issue(errors, "SCHEMA_CONSTRAINT", `Array must contain at most ${schema.maxItems} items.`, path, `${schemaPath}/maxItems`);
     if (schema.uniqueItems === true && new Set(value.map((item) => JSON.stringify(item))).size !== value.length) issue(errors, "SCHEMA_CONSTRAINT", "Array entries must be unique.", path, `${schemaPath}/uniqueItems`);
     if (schema.items && typeof schema.items === "object") value.forEach((entry, index) => visit(schema.items as JsonSchema, entry, ptr(path, index), `${schemaPath}/items`, errors));
   }

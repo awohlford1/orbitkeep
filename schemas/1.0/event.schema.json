@@ -118,6 +118,16 @@
       "minLength": 1,
       "pattern": "^act-[A-Za-z0-9][A-Za-z0-9._-]*$"
     },
+    "silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "silo_instance_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sinst-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
     "subject": {
       "type": "object",
       "required": [

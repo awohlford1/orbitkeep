@@ -9,7 +9,7 @@ consumer repository.
 Close active workflow assignments, then run:
 
 ```sh
-npm install --save-dev orbitkeep@0.4.2
+npm install --save-dev orbitkeep@0.5.0
 npx orbitkeep upgrade --plan
 npx orbitkeep upgrade --apply
 npx orbitkeep doctor
@@ -45,5 +45,7 @@ metadata-only state migration from 0.4.0 to 0.4.1. The latter advances the
 installation receipt while preserving canonical workflow records and event
 history. Version 0.4.2 adds a metadata-only migration from 0.4.1 that
 transactionally updates managed instructions and provider hooks to request
-machine-readable output explicitly. Other starting versions require a
-supported migration path or a documented manual procedure.
+machine-readable output explicitly. Version 0.5.0 adds a reversible migration
+from 0.4.2 for brokered provider-session controls and updated managed
+instructions without rewriting canonical history. Other starting versions
+require a supported migration path or a documented manual procedure.

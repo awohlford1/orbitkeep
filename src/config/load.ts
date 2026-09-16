@@ -126,6 +126,13 @@ function assertEffectiveRelationships(config: FrameworkConfiguration): void {
       path: "effective configuration.referenceValidation.retrySeconds",
     });
   }
+  if (config.execution.retryPolicy.backoffSeconds.length !== Math.max(0, config.execution.retryPolicy.maxAttempts - 1)) {
+    throw new AgentWorkflowError({
+      code: "CONFIG_INVALID_VALUE",
+      message: "execution.retryPolicy.backoffSeconds must contain one delay for every retry after the initial attempt.",
+      path: "effective configuration.execution.retryPolicy.backoffSeconds",
+    });
+  }
 }
 
 function deepFreeze<T>(value: T): Readonly<T> {

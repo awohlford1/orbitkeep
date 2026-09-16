@@ -1,33 +1,67 @@
-import { access, readFile, readdir } from "node:fs/promises";
+import { access, constants, readFile, readdir } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEffectiveConfiguration } from "../config/index.ts";
-import { installationStateDirectory, listInstallationTransactions, PINNED_AGENT_WORKFLOW_COMMAND, planRepair } from "../installer/index.ts";
+import { CLAUDE_HOOK_COMMAND, installationStateDirectory, listInstallationTransactions, planRepair } from "../installer/index.ts";
 import { CLAUDE_HOOK_EVENTS, ClaudeProviderAdapter } from "../providers/claude/index.ts";
 import { CodexProviderAdapter } from "../providers/codex/index.ts";
 import { coreSchemaRegistry } from "../registries/index.ts";
 import { resolveStatePaths } from "../storage/index.ts";
 import { generateRoles, loadRoleCatalogue } from "../roles/generate.ts";
 import { FRAMEWORK_VERSION, SUPPORTED_SCHEMA_VERSION } from "../version.ts";
+import { inspectSiloIdentity, LocalFileSiloCredentialProvider, registrationReceiptErrors, type RegistrationReceipt, type RegistrationRequest, type SiloCapabilitySnapshot, type SiloConnectionObservation, type SiloHealthAssessment } from "../silo/index.ts";
+import { inspectSupervisor } from "../control/supervisor.ts";
+import { buildHeadlessProviderInvocation } from "../control/headless.ts";
+import { resolveProviderExecutable, type SessionProvider } from "../control/sessions.ts";
 
 export { FRAMEWORK_VERSION, SUPPORTED_SCHEMA_VERSION } from "../version.ts";
 
 async function exists(filename: string): Promise<boolean> { try { await access(filename); return true; } catch { return false; } }
 async function count(directory: string): Promise<number> { try { return (await readdir(directory)).length; } catch { return 0; } }
 
-export interface ClaudeHookInspection { valid: boolean; missing: string[]; mismatched: string[] }
+export async function providerCliRuntime(command: "claude" | "codex", environment: NodeJS.ProcessEnv = process.env, platform = process.platform) {
+  const searchPath = environment.PATH ?? environment.Path ?? "";
+  const extensions = platform === "win32"
+    ? (environment.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)
+    : [""];
+  for (const directory of searchPath.split(path.delimiter).filter(Boolean)) {
+    for (const extension of extensions) {
+      const candidate = path.join(directory.replace(/^"|"$/g, ""), `${command}${extension}`);
+      try {
+        await access(candidate, platform === "win32" ? constants.F_OK : constants.X_OK);
+        return { command, available: true };
+      } catch { /* continue searching */ }
+    }
+  }
+  return { command, available: false };
+}
+
+export interface ClaudeHookInspection { valid: boolean; missing: string[]; mismatched: string[]; additional: string[] }
+
+function hookHandlers(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.flatMap(hookHandlers);
+  if (value === null || typeof value !== "object") return [];
+  const item = value as Record<string, unknown>;
+  if (typeof item.type === "string") return [item];
+  return Object.values(item).flatMap(hookHandlers);
+}
 
 export async function inspectClaudeHooks(filename: string): Promise<ClaudeHookInspection> {
-  const missing: string[] = []; const mismatched: string[] = [];
+  const missing: string[] = []; const mismatched: string[] = []; const additional: string[] = [];
   try {
     const value = JSON.parse(await readFile(filename, "utf8")) as { hooks?: Record<string, unknown> };
     for (const eventName of CLAUDE_HOOK_EVENTS) {
       const entries = value.hooks?.[eventName];
-      if (!Array.isArray(entries) || !JSON.stringify(entries).includes("provider claude hook")) missing.push(eventName);
-      else if (!JSON.stringify(entries).includes(PINNED_AGENT_WORKFLOW_COMMAND)) mismatched.push(eventName);
+      const handlers = hookHandlers(entries);
+      const expectedCommand = CLAUDE_HOOK_COMMAND;
+      const managed = handlers.filter((handler) => handler.command === expectedCommand);
+      if (!Array.isArray(entries) || managed.length === 0) missing.push(eventName);
+      else if (!managed.some((handler) => handler.command === expectedCommand)) mismatched.push(eventName);
+      if (handlers.some((handler) => handler.type !== "command" || handler.command !== expectedCommand)) additional.push(eventName);
     }
   } catch { missing.push(...CLAUDE_HOOK_EVENTS); }
-  return { valid: missing.length === 0 && mismatched.length === 0, missing, mismatched };
+  return { valid: missing.length === 0 && mismatched.length === 0, missing, mismatched, additional };
 }
 
 async function hasCodexIntegration(filename: string): Promise<boolean> {
@@ -117,10 +151,18 @@ export async function doctor(projectRoot: string) {
   try { effective = await loadEffectiveConfiguration({ projectRoot, requireProjectConfig: true }); } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
   let stateRoot = path.join(projectRoot, ".agent-state");
   try { stateRoot = (await resolveStatePaths(projectRoot, effective?.config.state.directory)).stateRoot; } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
-  const claudeHooks = await inspectClaudeHooks(path.join(projectRoot, ".claude", "settings.json"));
+  const projectClaudeHooks = await inspectClaudeHooks(path.join(projectRoot, ".claude", "settings.json"));
+  const claudeHooks = await inspectClaudeHooks(path.join(projectRoot, ".agent-workflow", "providers", "claude", "settings.json"));
   const codexIntegrated = await hasCodexIntegration(path.join(projectRoot, "AGENTS.md"));
   const claudeIntegrated = await hasClaudeIntegration(path.join(projectRoot, "CLAUDE.md"));
+  const providerRuntime = {
+    claude: await providerCliRuntime("claude"),
+    codex: await providerCliRuntime("codex"),
+  };
+  if ((effective?.config.providers.claude?.enabled ?? false) && !providerRuntime.claude.available) warnings.push("Claude integration is installed, but the `claude` CLI is not available on PATH.");
+  if ((effective?.config.providers.codex?.enabled ?? false) && !providerRuntime.codex.available) warnings.push("Codex integration is installed, but the `codex` CLI is not available on PATH.");
   if ((effective?.config.providers.claude?.enabled ?? false) && !claudeHooks.valid) warnings.push(`Claude hook integration is incomplete (missing: ${claudeHooks.missing.join(", ") || "none"}; unpinned: ${claudeHooks.mismatched.join(", ") || "none"}).`);
+  if ((effective?.config.providers.claude?.enabled ?? false) && projectClaudeHooks.additional.length) warnings.push(`Additional project Claude hooks were detected for ${projectClaudeHooks.additional.join(", ")}. Orbitkeep Missions exclude project settings and use isolated managed hooks; bare Claude sessions remain subject to the project hooks.`);
   if ((effective?.config.providers.codex?.enabled ?? false) && !codexIntegrated) warnings.push("Codex manager instructions do not reference the pinned Orbitkeep CLI.");
   const requiredContracts = ["README.md", "MANAGER.md", "CONTRACTS.md", "ROLES.md"];
   const missingContracts = (await Promise.all(requiredContracts.map(async (name) => await exists(path.join(projectRoot, ".agent-workflow", "contracts", name)) ? undefined : name))).filter((name): name is string => name !== undefined);
@@ -161,19 +203,78 @@ export async function doctor(projectRoot: string) {
   info.push("Local ignored state is not a backup.", "Live cross-provider process takeover is unsupported.");
   const providerStatuses = Object.fromEntries(Object.entries(effective?.config.providers ?? {}).sort(([left], [right]) => left.localeCompare(right)).map(([provider, policy]) => [provider, assessProviderActivation(provider, policy.enabled, policy.requiredMode, { claude: claudeIntegrated, codex: codexIntegrated }, claudeHooks)]));
   const providerFailures = Object.values(providerStatuses).filter((item) => item.status === "repair_required" || item.status === "unsupported");
+  const siloIdentity = await inspectSiloIdentity(projectRoot, effective?.config.state.directory ?? ".agent-state");
+  for (const issue of siloIdentity.errors.filter((item) => item.code !== "SILO_IDENTITY_MISSING")) errors.push(`${issue.code}: ${issue.message}`);
+  const keyMetadataPath = path.join(stateRoot, "registration", "keys.json");
+  let keyMetadataInvalid = false;
+  let keyMetadata: { active_key_id?: string; provider?: string; protection?: string; public_keys?: unknown[] } | undefined;
+  if (await exists(keyMetadataPath)) {
+    try {
+      const candidate = JSON.parse(await readFile(keyMetadataPath, "utf8")) as typeof keyMetadata;
+      const validation = coreSchemaRegistry.validateRecord("silo-key-metadata", candidate, "1.0");
+      if (!validation.valid) { keyMetadataInvalid = true; errors.push(`SILO_KEY_METADATA_INVALID: ${validation.errors.map((item) => `${item.instancePath || "/"}: ${item.message}`).join("; ")}`); }
+      else keyMetadata = candidate;
+    } catch { keyMetadataInvalid = true; errors.push("SILO_KEY_METADATA_INVALID: Silo key metadata contains malformed JSON."); }
+  }
+  const credentialAssessment = keyMetadata ? await new LocalFileSiloCredentialProvider(projectRoot, effective?.config.state.directory ?? ".agent-state").assess() : undefined;
+  if (credentialAssessment?.protection === "local_file_degraded") warnings.push(...credentialAssessment.findings);
+  if (credentialAssessment?.available === false) errors.push(...credentialAssessment.findings);
+  const registrationRequestPath = path.join(stateRoot, "registration", "request.json"); const registrationReceiptPath = path.join(stateRoot, "registration", "receipt.json");
+  let registrationRequest: RegistrationRequest | undefined; let registrationReceipt: RegistrationReceipt | undefined; let registrationInvalid = false;
+  if (await exists(registrationRequestPath)) try {
+    const candidate = JSON.parse(await readFile(registrationRequestPath, "utf8")) as RegistrationRequest; const validation = coreSchemaRegistry.validateRecord("silo-registration-request", candidate, "1.0");
+    if (!validation.valid) { registrationInvalid = true; errors.push(`SILO_REGISTRATION_INVALID: ${validation.errors.map((item) => `${item.instancePath || "/"}: ${item.message}`).join("; ")}`); } else registrationRequest = candidate;
+  } catch { registrationInvalid = true; errors.push("SILO_REGISTRATION_INVALID: registration request contains malformed JSON."); }
+  if (await exists(registrationReceiptPath)) try {
+    const candidate = JSON.parse(await readFile(registrationReceiptPath, "utf8")) as RegistrationReceipt;
+    const receiptErrors = registrationReceiptErrors(candidate, registrationRequest, effective?.config.silo.registration.trustedAuthorityKeys ?? {}, new Date());
+    if (receiptErrors.length) { registrationInvalid = true; errors.push(`SILO_REGISTRATION_INVALID: ${receiptErrors.join("; ")}`); } else registrationReceipt = candidate;
+  } catch { registrationInvalid = true; errors.push("SILO_REGISTRATION_INVALID: registration receipt contains malformed JSON."); }
+  const siloPending = (await Promise.all((await readdir(path.join(stateRoot, "pending")).catch(() => [])).filter((name) => name.endsWith(".json")).map(async (name) => readFile(path.join(stateRoot, "pending", name), "utf8").then((value) => JSON.parse(value) as { silo_id?: string }).catch(() => undefined)))).some((item) => item?.silo_id === siloIdentity.descriptor?.silo_id);
+  if (effective?.config.silo.registration.required && !registrationReceipt) errors.push("SILO_REGISTRATION_REQUIRED: a valid Keep registration is required by the Local Charter.");
+  let lifecycleInvalid = false; let capabilitySnapshot: SiloCapabilitySnapshot | undefined; let connectionObservation: SiloConnectionObservation | undefined; let storedHealth: SiloHealthAssessment | undefined;
+  for (const item of [
+    { filename: "capabilities.json", recordType: "silo-capabilities", assign: (value: unknown) => { capabilitySnapshot = value as SiloCapabilitySnapshot; } },
+    { filename: "connection.json", recordType: "silo-connection-observation", assign: (value: unknown) => { connectionObservation = value as SiloConnectionObservation; } },
+    { filename: "health.json", recordType: "silo-health-assessment", assign: (value: unknown) => { storedHealth = value as SiloHealthAssessment; } },
+  ] as const) {
+    const filename = path.join(stateRoot, "registration", item.filename); if (!await exists(filename)) continue;
+    try {
+      const candidate = JSON.parse(await readFile(filename, "utf8")) as { silo_id?: string; silo_instance_id?: string };
+      const validation = coreSchemaRegistry.validateRecord(item.recordType, candidate, "1.0");
+      if (!validation.valid || candidate.silo_id !== siloIdentity.descriptor?.silo_id || candidate.silo_instance_id !== siloIdentity.instance?.silo_instance_id) { lifecycleInvalid = true; errors.push(`SILO_LIFECYCLE_INVALID: ${item.filename} is invalid or bound to another Silo instance.`); }
+      else item.assign(candidate);
+    } catch { lifecycleInvalid = true; errors.push(`SILO_LIFECYCLE_INVALID: ${item.filename} contains malformed JSON.`); }
+  }
+  let observedConnectivity = connectionObservation?.state ?? "offline";
+  if (observedConnectivity === "connected" && Date.parse(connectionObservation?.valid_until ?? "") <= Date.now()) { observedConnectivity = "disconnected"; warnings.push("The last connected observation exceeded its liveness window and is now treated as disconnected."); }
   const managedRepair = await planRepair(projectRoot);
+  if (!managedRepair.safe) errors.push(`Manual repair is required: ${managedRepair.actions.filter((item) => item.action === "manual").map((item) => item.reason).join("; ")}`);
   let installationTransactions: Awaited<ReturnType<typeof listInstallationTransactions>> = [];
   try { installationTransactions = await listInstallationTransactions(projectRoot, await installationStateDirectory(projectRoot)); }
   catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
   const interruptedTransactions = installationTransactions.filter((item) => ["prepared", "applying", "rolling_back", "failed"].includes(item.status));
   if (interruptedTransactions.length) errors.push(`Interrupted installation transactions require recovery: ${interruptedTransactions.map((item) => item.transactionId).join(", ")}.`);
   const activation = errors.length > 0 ? "blocked" : managedRepair.actions.length > 0 || providerFailures.some((item) => item.status === "repair_required") ? "repair_required" : providerFailures.length > 0 ? "blocked" : Object.values(providerStatuses).some((item) => item.status === "active") ? "active" : "active_limited";
+  const siloHealth = !managedRepair.safe || keyMetadataInvalid || registrationInvalid || lifecycleInvalid || storedHealth?.state === "blocked" || (effective?.config.silo.registration.required && !registrationReceipt) || credentialAssessment?.available === false || siloIdentity.errors.some((item) => item.code !== "SILO_IDENTITY_MISSING") ? "blocked" : credentialAssessment?.protection === "local_file_degraded" || storedHealth?.state === "degraded" ? "degraded" : siloIdentity.valid ? "healthy" : "degraded";
+  const administrativeState = registrationReceipt ? "registered" : siloPending ? "registration_pending" : "unregistered";
+  const silo = {
+    identity: { valid: siloIdentity.valid, ...(siloIdentity.descriptor ? { siloId: siloIdentity.descriptor.silo_id, identityVersion: siloIdentity.descriptor.identity_version, originHint: siloIdentity.descriptor.origin_hint } : {}), ...(siloIdentity.instance ? { siloInstanceId: siloIdentity.instance.silo_instance_id, instanceVersion: siloIdentity.instance.instance_version } : {}), errors: siloIdentity.errors },
+    administrativeState, connectivityState: observedConnectivity, healthState: siloHealth,
+    membership: registrationReceipt ? { registrationId: registrationReceipt.registration_id, keepId: registrationReceipt.keep_id, ...(registrationReceipt.colony_id ? { colonyId: registrationReceipt.colony_id } : {}), revalidateAt: registrationReceipt.revalidate_at } : undefined,
+    credential: keyMetadata ? { provider: keyMetadata.provider, protection: credentialAssessment?.protection ?? keyMetadata.protection, activeKeyId: keyMetadata.active_key_id, publicKeyCount: keyMetadata.public_keys?.length ?? 0, available: credentialAssessment?.available ?? false, findings: credentialAssessment?.findings ?? [] } : { configured: false },
+    capabilities: capabilitySnapshot ? { values: capabilitySnapshot.capabilities, digest: capabilitySnapshot.digest, observedAt: capabilitySnapshot.observed_at } : undefined,
+    latestHealthAssessment: storedHealth ? { state: storedHealth.state, assessedAt: storedHealth.assessed_at, findings: storedHealth.findings } : undefined,
+    latestConnectionObservation: connectionObservation ? { state: connectionObservation.state, observedAt: connectionObservation.observed_at, validUntil: connectionObservation.valid_until, reason: connectionObservation.reason } : undefined,
+    displayState: siloHealth === "blocked" ? "blocked" : siloHealth === "degraded" ? "degraded" : observedConnectivity === "connected" ? "connected" : observedConnectivity === "disconnected" ? "disconnected" : administrativeState,
+  };
   const capabilities = await capabilityReport({ claudeBlockingHook: claudeHooks.valid, claudeWorkflowAuthorizationConnected: claudeHooks.valid });
+  const supervisor = await inspectSupervisor(stateRoot);
   return {
-    healthy: errors.length === 0, frameworkVersion: FRAMEWORK_VERSION, configurationSchemaVersion: SUPPORTED_SCHEMA_VERSION, recordSchemaVersion: SUPPORTED_SCHEMA_VERSION, eventSchemaVersion: SUPPORTED_SCHEMA_VERSION,
+    healthy: activation === "active" || activation === "active_limited", frameworkVersion: FRAMEWORK_VERSION, configurationSchemaVersion: SUPPORTED_SCHEMA_VERSION, recordSchemaVersion: SUPPORTED_SCHEMA_VERSION, eventSchemaVersion: SUPPORTED_SCHEMA_VERSION,
     configurationDigest: effective?.digest, stateRoot, stateRootSafety: { contained: !path.relative(projectRoot, stateRoot).startsWith(".."), gitignored: stateRootIgnored, ignoredPath },
     enabledProviders: Object.entries(effective?.config.providers ?? {}).filter(([, value]) => value.enabled).map(([name]) => name).sort(),
-    activation, providerActivation: providerStatuses, repair: managedRepair, integrations: { claude: claudeHooks.valid, codex: codexIntegrated }, hookInspection: { claude: claudeHooks }, capabilities,
+    activation, silo, supervisor, providerActivation: providerStatuses, providerRuntime, repair: managedRepair, integrations: { claude: claudeHooks.valid, codex: codexIntegrated }, hookInspection: { claude: claudeHooks, claudeProject: projectClaudeHooks }, missionIsolation: { claude: { enabled: claudeHooks.valid, settingSources: [], settingsPath: ".agent-workflow/providers/claude/settings.json" } }, capabilities,
     contracts: { valid: missingContracts.length === 0, missing: missingContracts },
     roles: { valid: unknownRoles.length === 0 && missingRoleAdapters.length === 0 && roleGeneration.valid, configured: configuredRoles, unknown: unknownRoles, missingAdapters: missingRoleAdapters, drift: roleGeneration.mismatches },
     schemas: { registryComplete, recordTypes: coreSchemaRegistry.recordTypes().length, eventTypes: coreSchemaRegistry.eventTypes().length, extensions: Object.keys(effective?.extensions ?? {}) },
@@ -186,5 +287,87 @@ export async function doctor(projectRoot: string) {
 
 export async function validateInstallation(projectRoot: string) {
   const report = await doctor(projectRoot);
-  return { valid: report.healthy && report.activation !== "blocked" && report.activation !== "repair_required" && report.contracts.valid && report.roles.valid, activation: report.activation, providerActivation: report.providerActivation, configurationDigest: report.configurationDigest, integration: { claude: report.integrations.claude, codex: report.integrations.codex }, errors: report.errors, warnings: report.warnings, schemas: report.schemas, contracts: report.contracts, roles: report.roles };
+  return { valid: report.healthy && report.activation !== "blocked" && report.activation !== "repair_required" && report.contracts.valid && report.roles.valid && report.silo.identity.valid, activation: report.activation, silo: report.silo, providerActivation: report.providerActivation, configurationDigest: report.configurationDigest, integration: { claude: report.integrations.claude, codex: report.integrations.codex }, errors: report.errors, warnings: report.warnings, schemas: report.schemas, contracts: report.contracts, roles: report.roles };
+}
+
+async function providerAuthentication(provider: SessionProvider, environment: NodeJS.ProcessEnv): Promise<{ state: "authenticated" | "unauthenticated" | "unavailable" | "unknown"; reason: string }> {
+  let resolved: Awaited<ReturnType<typeof resolveProviderExecutable>>;
+  try { resolved = await resolveProviderExecutable(provider, environment); }
+  catch { return { state: "unavailable", reason: `The ${provider} CLI executable could not be resolved.` }; }
+  const args = provider === "claude" ? ["auth", "status", "--json"] : ["login", "status"];
+  return new Promise((resolve) => {
+    const child = spawn(resolved.executable, args, { env: environment, windowsHide: true, shell: resolved.shell, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = ""; let settled = false;
+    const finish = (value: { state: "authenticated" | "unauthenticated" | "unavailable" | "unknown"; reason: string }) => { if (settled) return; settled = true; clearTimeout(timer); resolve(value); };
+    const timer = setTimeout(() => { child.kill(); finish({ state: "unknown", reason: "The authentication status probe timed out." }); }, 5_000);
+    timer.unref();
+    child.stdout?.setEncoding("utf8"); child.stdout?.on("data", (chunk: string) => { if (stdout.length < 64 * 1024) stdout += chunk.slice(0, 64 * 1024 - stdout.length); });
+    child.once("error", () => finish({ state: "unavailable", reason: `The ${provider} authentication status command could not start.` }));
+    child.once("close", (code) => {
+      if (provider === "claude") {
+        try {
+          const status = JSON.parse(stdout) as { loggedIn?: unknown };
+          finish(status.loggedIn === true
+            ? { state: "authenticated", reason: "Claude reports an authenticated local session." }
+            : { state: "unauthenticated", reason: "Claude reports that no authenticated local session is active." });
+        } catch { finish({ state: code === 0 ? "unknown" : "unauthenticated", reason: "Claude did not return a parseable authentication status." }); }
+        return;
+      }
+      finish(code === 0
+        ? { state: "authenticated", reason: "Codex reports an authenticated local session." }
+        : { state: "unauthenticated", reason: "Codex did not confirm an authenticated local session." });
+    });
+  });
+}
+
+async function providerHeadlessCompatibility(provider: SessionProvider, environment: NodeJS.ProcessEnv): Promise<{ supported: boolean; reason: string }> {
+  let resolved: Awaited<ReturnType<typeof resolveProviderExecutable>>;
+  try { resolved = await resolveProviderExecutable(provider, environment); }
+  catch { return { supported: false, reason: `The ${provider} CLI executable could not be resolved.` }; }
+  const args = provider === "claude" ? ["--help"] : ["exec", "--help"];
+  return new Promise((resolve) => {
+    const child = spawn(resolved.executable, args, { env: environment, windowsHide: true, shell: resolved.shell, stdio: ["ignore", "pipe", "pipe"] });
+    let output = ""; let settled = false;
+    const finish = (value: { supported: boolean; reason: string }) => { if (settled) return; settled = true; clearTimeout(timer); resolve(value); };
+    const timer = setTimeout(() => { child.kill(); finish({ supported: false, reason: `The ${provider} headless capability probe timed out.` }); }, 5_000);
+    timer.unref();
+    const capture = (chunk: string) => { if (output.length < 128 * 1024) output += chunk.slice(0, 128 * 1024 - output.length); };
+    child.stdout?.setEncoding("utf8"); child.stdout?.on("data", capture);
+    child.stderr?.setEncoding("utf8"); child.stderr?.on("data", capture);
+    child.once("error", () => finish({ supported: false, reason: `The ${provider} headless capability probe could not start.` }));
+    child.once("close", (code) => {
+      const required = provider === "claude" ? ["--setting-sources", "--settings", "--output-format"] : ["--json", "--sandbox"];
+      const missing = required.filter((flag) => !output.includes(flag));
+      finish(code === 0 && missing.length === 0
+        ? { supported: true, reason: `The installed ${provider} CLI exposes Orbitkeep's required headless options.` }
+        : { supported: false, reason: code !== 0 ? `The ${provider} headless capability probe exited with code ${code}.` : `The installed ${provider} CLI is missing required options: ${missing.join(", ")}.` });
+    });
+  });
+}
+
+export async function providerDoctor(projectRoot: string, provider: SessionProvider, environment: NodeJS.ProcessEnv = process.env) {
+  const effective = await loadEffectiveConfiguration({ projectRoot, requireProjectConfig: true });
+  const projectHooks = await inspectClaudeHooks(path.join(projectRoot, ".claude", "settings.json"));
+  const hooks = await inspectClaudeHooks(path.join(projectRoot, ".agent-workflow", "providers", "claude", "settings.json"));
+  const integrations = { claude: await hasClaudeIntegration(path.join(projectRoot, "CLAUDE.md")), codex: await hasCodexIntegration(path.join(projectRoot, "AGENTS.md")) };
+  const policy = effective.config.providers[provider];
+  const activation = assessProviderActivation(provider, policy?.enabled ?? false, policy?.requiredMode, integrations, hooks);
+  let executableAvailable = true;
+  try { await resolveProviderExecutable(provider, environment); } catch { executableAvailable = false; }
+  if (executableAvailable) executableAvailable = (await providerCliRuntime(provider, environment)).available || Boolean(environment[`ORBITKEEP_${provider.toUpperCase()}_EXECUTABLE`]);
+  const authentication = executableAvailable ? await providerAuthentication(provider, environment) : { state: "unavailable" as const, reason: `The ${provider} CLI is not available.` };
+  const headlessCompatibility = executableAvailable ? await providerHeadlessCompatibility(provider, environment) : { supported: false, reason: `The ${provider} CLI is not available.` };
+  const capabilities = await capabilityReport({ claudeBlockingHook: hooks.valid, claudeWorkflowAuthorizationConnected: hooks.valid });
+  const permissionControl = provider === "claude"
+    ? { state: hooks.valid ? "enforced" : "repair_required", reason: hooks.valid ? "Claude blocking hooks are installed and connected to workflow authorization." : "Claude blocking hooks are incomplete." }
+    : { state: integrations.codex ? "instructed" : "repair_required", reason: integrations.codex ? "Codex Flight Director instructions are installed; native universal tool blocking is not claimed." : "Codex Flight Director instructions are missing." };
+  const invocation = buildHeadlessProviderInvocation(provider, "execute", projectRoot);
+  const ready = activation.status === "active" && executableAvailable && authentication.state === "authenticated" && headlessCompatibility.supported && permissionControl.state !== "repair_required";
+  return {
+    status: ready ? "ready" : "attention_required", provider, activation,
+    runtime: { available: executableAvailable }, authentication,
+    headlessExecution: { supported: headlessCompatibility.supported, reason: headlessCompatibility.reason, transport: "jsonl", mode: provider === "claude" ? "print" : "exec", workingDirectory: invocation.cwd, ...(provider === "claude" ? { isolatedSettings: hooks.valid, additionalProjectHookEvents: projectHooks.additional } : {}) },
+    eventStreaming: { supported: true, normalized: true }, permissionControl,
+    capabilities: capabilities.providers[provider],
+  };
 }

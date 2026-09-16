@@ -9,30 +9,44 @@ export const CORE_EVENT_TYPES = [
   "assignment.pause_incomplete", "assignment.handover_requested", "assignment.handover_ready",
   "assignment.handover_incomplete", "plan.proposed", "plan.approved", "plan.rejected",
   "plan.approval_waived", "plan.change_assessed", "plan.superseded", "task.created",
-  "task.validated", "task.dispatch_requested", "task.dispatched", "task.change_requested", "task.closed", "task.cancelled",
+  "task.validated", "task.dispatch_requested", "task.dispatched", "task.change_requested", "task.closed", "task.cancelled", "task.skipped", "task.blocked",
+  "task.gate_passed", "task.gate_failed", "task.gate_waived",
+  "task.cancellation_requested", "task.cancellation_incomplete",
   "task.superseded", "execution.started", "execution.progress_reported",
   "execution.heartbeat_observed", "execution.message_sent", "execution.message_acknowledged",
   "execution.completed", "execution.failed", "execution.cancelled", "execution.outcome_unknown",
+  "execution.retry_available", "execution.retry_scheduled", "execution.retry_started", "execution.retry_exhausted",
   "execution.stop_requested", "execution.checkpointed", "execution.stopped",
   "action.intent_recorded", "action.started", "action.succeeded", "action.failed",
   "action.prevented", "action.cancelled", "action.outcome_unknown", "action.reconciled",
   "submission.received", "submission.awaiting_validation", "submission.validation_passed",
   "submission.rejected", "submission.validation_timed_out", "quarantine.resolved",
   "result.accepted", "result.changes_requested", "evidence.recorded", "decision.recorded",
+  "usage.observed", "budget.exceeded",
+  "route.created", "route.evaluated", "route.applied",
+  "template.applied",
   "approval.requested", "approval.granted", "approval.rejected", "approval.revoked",
   "approval.expired", "escalation.raised", "escalation.resolved",
   "manager.ownership_acquired", "manager.ownership_released", "record.closed",
   "archive.completed", "archive.failed", "cleanup.completed", "runtime.operation_blocked",
   "event.corrected", "framework.migration_completed", "framework.migration_rolled_back",
+  "silo.identity_created", "silo.identity_derived", "silo.instance_created",
+  "silo.registration_requested", "silo.registration_granted", "silo.registration_rejected",
+  "silo.registration_revoked", "silo.registration_expired", "silo.connection_changed",
+  "silo.capabilities_observed", "silo.health_assessed", "silo.key_rotation_requested",
+  "silo.key_rotated", "silo.retirement_requested", "silo.retired",
 ] as const;
 
 export type CoreEventType = (typeof CORE_EVENT_TYPES)[number];
 
 export const CORE_RECORD_TYPES = [
-  "configuration", "assignment", "plan", "checkpoint", "work-item", "task", "task-packet",
+  "configuration", "assignment", "plan", "checkpoint", "work-item", "task", "route", "template-application", "task-packet",
   "execution", "action", "result", "assessment", "approval", "decision", "evidence",
   "escalation", "pending", "quarantine", "hold", "archive-manifest", "cleanup-manifest",
-  "awaiting-validation", "action-reconciliation", "raw-response",
+  "awaiting-validation", "action-reconciliation", "raw-response", "usage-observation",
+  "silo-descriptor", "silo-instance", "silo-registration-request",
+  "silo-registration-receipt", "silo-capabilities", "silo-connection-observation",
+  "silo-health-assessment", "silo-key-metadata",
 ] as const;
 
 export type CoreRecordType = (typeof CORE_RECORD_TYPES)[number];

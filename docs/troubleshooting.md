@@ -1,10 +1,85 @@
 # Troubleshooting
 
+## Provider integration is active but the CLI is not found
+
+Orbitkeep can install provider hooks and instructions without installing the
+provider's own CLI. Install and authenticate Claude Code or Codex CLI in the
+same Ubuntu, WSL, macOS, or Windows environment where `npx orbitkeep` runs, then
+rerun `npx orbitkeep doctor`. An `active` integration alone does not mean its
+provider executable is available.
+
+## Claude reports `WORKFLOW_BROKER_SESSION_REQUIRED`
+
+The repository has enforced Claude hooks, but Claude was launched directly or
+the headless broker context was lost. Exit that session and start the Mission
+from the repository root:
+
+```sh
+npx orbitkeep mission start --provider claude
+```
+
+Do not copy assignment IDs, ownership tokens, or broker secrets into a provider
+session manually. Orbitkeep creates the Mission, retains those values, and
+binds them to its headless provider processes.
+
 Start with the health report:
 
 ```sh
 npx orbitkeep doctor
 ```
+
+## PowerShell windows repeatedly appear while Claude is running
+
+Current Orbitkeep installations invoke Claude hooks through
+`.agent-workflow/providers/claude/hook.cjs`, without launching `npx` for every
+provider event. Run `npx orbitkeep upgrade --plan` and apply the upgrade, or run
+`npx orbitkeep repair --plan` followed by `repair --apply`, if doctor reports
+the managed runner or hook settings as outdated. Then confirm that
+`.claude/settings.json` references the managed `hook.cjs` file.
+
+The background supervisor itself is hidden on Windows and remains controllable:
+
+```sh
+npx orbitkeep supervisor status
+npx orbitkeep mission stop --provider claude
+npx orbitkeep supervisor stop
+```
+
+Supervisor shutdown refuses to abandon active Missions unless `--force` is
+explicitly supplied.
+
+## Mission logs report `EMFILE` or contain no useful activity
+
+Upgrade or repair the installation so new Missions write one bounded per-job
+activity stream under `.agent-state/control/supervisor/logs/`. The current log
+reader remains compatible with older raw-response records but processes them
+sequentially to avoid exhausting the operating-system file limit.
+
+```sh
+npx orbitkeep mission status --provider claude
+npx orbitkeep mission logs --provider claude
+npx orbitkeep mission logs --provider claude --limit 250
+npx orbitkeep mission watch --provider claude
+```
+
+Interactive Mission launches follow activity automatically. If you detached
+with `Ctrl+C`, used `--detach`, or closed the terminal, `mission watch`
+reconnects to the current Mission. Detaching the viewer does not stop the
+supervisor or provider process.
+
+Normal activity logs are separate from opt-in raw provider-response capture.
+Existing legacy files are preserved until the configured cleanup process
+removes records that have reached their retention deadline.
+
+## A pre-existing Claude hook blocks or rewrites a Mission response
+
+Run `npx orbitkeep doctor --json` and inspect
+`hookInspection.claudeProject.additional`. Orbitkeep-managed Missions use only
+`.agent-workflow/providers/claude/settings.json` and exclude project and user
+settings sources, so these hooks should affect bare Claude sessions only. If
+`missionIsolation.claude.enabled` is false, run `npx orbitkeep repair --plan`
+and apply the repair before starting another Mission. Do not delete a
+project-owned hook merely to make Orbitkeep report healthy.
 
 ## Installation needs repair
 

@@ -6,7 +6,8 @@ import { coreSchemaRegistry } from "../registries/index.ts";
 import { initializeStateRoot, writeJsonAtomic } from "../storage/index.ts";
 import type { JsonValue } from "../storage/index.ts";
 import { FRAMEWORK_VERSION } from "../version.ts";
-import { expectedManagedFiles, installationStateDirectory, performRepairPlan, planRepair, type RepairPlan } from "./index.ts";
+import { expectedManagedFiles, installationStateDirectory, performRepairPlan, planRepair, recordSiloIdentityEvents, type RepairPlan } from "./index.ts";
+import { ensureSiloIdentity } from "../silo/index.ts";
 import { listInstallationTransactions, recoverInterruptedTransactions, rollbackInstallationTransaction, runInstallationTransaction, type InstallationTransaction } from "./transactions.ts";
 
 export type UpgradeActionKind = "create" | "replace-managed" | "reconcile-shared" | "migrate-config" | "migrate-state" | "preserve" | "manual-conflict" | "retire";
@@ -21,6 +22,7 @@ export const FRAMEWORK_MIGRATIONS: readonly FrameworkMigration[] = [
   { id: "migration-0.3.0-to-0.4.0", fromVersion: "0.3.0", toVersion: "0.4.0", reversible: true, migrateConfig: true, migrateState: true },
   { id: "migration-0.4.0-to-0.4.1", fromVersion: "0.4.0", toVersion: "0.4.1", reversible: true, migrateConfig: false, migrateState: true },
   { id: "migration-0.4.1-to-0.4.2", fromVersion: "0.4.1", toVersion: "0.4.2", reversible: true, migrateConfig: false, migrateState: true },
+  { id: "migration-0.4.2-to-0.5.0", fromVersion: "0.4.2", toVersion: "0.5.0", reversible: true, migrateConfig: false, migrateState: true },
 ] as const;
 
 function migrationPath(fromVersion: string, toVersion: string): FrameworkMigration[] | undefined {
@@ -118,6 +120,7 @@ export async function applyUpgrade(projectRoot: string, options: { targetVersion
     },
     validate: async () => { const after = await planUpgrade(plan.projectRoot, plan.toVersion); if (!after.safe || after.actions.some((item) => item.kind !== "preserve")) throw new Error("UPGRADE_VALIDATION_FAILED"); },
   });
+  await recordSiloIdentityEvents(plan.projectRoot, stateDirectory, await ensureSiloIdentity(plan.projectRoot, stateDirectory));
   await appendEvent({ projectRoot: plan.projectRoot, stateDirectory, operationId: `op-${randomUUID()}`, validator: { validate: (_id, value, version) => coreSchemaRegistry.validateEvent(value, version) }, schemaId: "event", event: { schema_version: "1.0", event_id: `evt-${randomUUID()}`, event_type: "framework.migration_completed", occurred_at: new Date().toISOString(), actor: { actor_id: "runtime-agent-workflow", actor_type: "runtime" }, recorded_by: { actor_id: "runtime-agent-workflow", actor_type: "runtime" }, data: { from_version: plan.fromVersion ?? "unknown", to_version: plan.toVersion, transaction_id: executed.transaction.transactionId } } });
   return { status: "upgraded", plan, transaction: executed.transaction, migrationEvidence: executed.result };
 }

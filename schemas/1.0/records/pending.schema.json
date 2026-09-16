@@ -9,7 +9,6 @@
     "created_at",
     "pending_id",
     "action_id",
-    "assignment_id",
     "status"
   ],
   "properties": {
@@ -47,6 +46,16 @@
       "minLength": 1,
       "pattern": "^asn-[A-Za-z0-9][A-Za-z0-9._-]*$"
     },
+    "silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^sreq-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
     "status": {
       "const": "unresolved"
     },
@@ -62,5 +71,18 @@
       ]
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "required": [
+        "assignment_id"
+      ]
+    },
+    {
+      "required": [
+        "silo_id",
+        "request_id"
+      ]
+    }
+  ]
 }

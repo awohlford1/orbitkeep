@@ -15,7 +15,9 @@ export interface PendingAction {
   created_at: string;
   pending_id: string;
   action_id: string;
-  assignment_id: string;
+  assignment_id?: string;
+  silo_id?: string;
+  request_id?: string;
   status: "unresolved";
   observed_outcome: "unknown";
 }
@@ -27,7 +29,9 @@ export interface ActionReconciliation {
   created_at: string;
   reconciliation_id: string;
   action_id: string;
-  assignment_id: string;
+  assignment_id?: string;
+  silo_id?: string;
+  request_id?: string;
   operation_id: string;
   outcome: ConcreteActionOutcome;
   reconciled_at: string;
@@ -69,8 +73,8 @@ export async function reconcilePendingAction(stateRoot: string, actionId: string
   }
   const pending = await readPendingAction(stateRoot, actionId);
   if (pending === undefined) throw storageError("STATE_RECORD_NOT_FOUND", `Pending action not found: ${actionId}`);
-  if (reconciliation.action_id !== actionId || reconciliation.assignment_id !== pending.assignment_id) {
-    throw storageError("PENDING_ACTION_MISMATCH", "Reconciliation does not refer to the pending action and assignment");
+  if (reconciliation.action_id !== actionId || reconciliation.assignment_id !== pending.assignment_id || reconciliation.silo_id !== pending.silo_id || reconciliation.request_id !== pending.request_id) {
+    throw storageError("PENDING_ACTION_MISMATCH", "Reconciliation does not refer to the pending action and its durable scope");
   }
   const target = await writeJsonImmutableIdempotent(stateRoot, reconciliationRelative, reconciliation as unknown as JsonValue);
   await rm(await assertContainedStatePath(stateRoot, pendingRelative(actionId)));

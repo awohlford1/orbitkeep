@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-workflow.dev/schemas/1.0/records/silo-descriptor.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "silo_id",
+    "created_at",
+    "identity_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "identity_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "derived_from_silo_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^silo-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "origin_hint": {
+      "type": "object",
+      "required": [
+        "provider",
+        "repository"
+      ],
+      "properties": {
+        "provider": {
+          "enum": [
+            "github",
+            "gitlab",
+            "bitbucket",
+            "other"
+          ]
+        },
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)+$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

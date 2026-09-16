@@ -151,6 +151,105 @@
       },
       "uniqueItems": true
     },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "budget": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "inputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "costMicros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxRuns": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "budget_status": {
+      "type": "object",
+      "required": [
+        "state",
+        "exceededDimensions",
+        "assessedAt"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "active",
+            "exceeded"
+          ]
+        },
+        "exceededDimensions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "inputTokens",
+              "outputTokens",
+              "totalTokens",
+              "costMicros",
+              "elapsedMs",
+              "maxRuns"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "assessedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "usage": {
+      "type": "object",
+      "required": [
+        "inputTokens",
+        "outputTokens",
+        "cachedInputTokens",
+        "costMicros"
+      ],
+      "properties": {
+        "inputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cachedInputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "costMicros": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
     "nonmaterial_change_count": {
       "type": "integer",
       "minimum": 0

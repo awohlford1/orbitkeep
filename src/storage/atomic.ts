@@ -17,12 +17,15 @@ async function durableWrite(pathname: string, content: string, flag: "wx" | "w")
 }
 
 async function replaceWithRetry(source: string, target: string): Promise<void> {
+  // Windows can transiently deny rename while a reader or filesystem scanner
+  // holds the destination. Keep retries bounded and limited to sharing errors.
+  const maximumRetries = process.platform === "win32" ? 20 : 9;
   for (let attempt = 0; ; attempt += 1) {
     try { await rename(source, target); return; }
     catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
-      if ((code !== "EPERM" && code !== "EACCES") || attempt >= 9) throw error;
-      await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 5));
+      if ((code !== "EPERM" && code !== "EACCES") || attempt >= maximumRetries) throw error;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(50, (attempt + 1) * 5)));
     }
   }
 }

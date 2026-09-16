@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -35,8 +36,34 @@ test("package subpath exports expose the downstream interface baseline", () => {
   assert.match(publicConfigurationDigest({ stable: true }), /^sha256:[a-f0-9]{64}$/);
 });
 
+test("public package subpaths change only through an explicit contract update", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+  assert.deepEqual(Object.keys(manifest.exports), [
+    ".",
+    "./contracts",
+    "./config",
+    "./policy",
+    "./commands",
+    "./storage",
+    "./evidence",
+    "./providers/claude",
+    "./providers/codex",
+    "./installer",
+    "./integrations/jira",
+    "./scheduling",
+    "./workflows",
+    "./schemas/workflow-template.json",
+    "./schemas/relay-envelope.json",
+    "./schemas/charter.json",
+    "./templates/software-delivery.json",
+    "./silo",
+    "./relay",
+    "./defaults/config.json",
+  ]);
+});
+
 test("package root export is generated and exposes versioned installer APIs", () => {
-  assert.equal(FRAMEWORK_VERSION, "0.4.2");
+  assert.equal(FRAMEWORK_VERSION, "0.5.0");
   assert.equal(typeof publicPlanUpgrade, "function");
 });
 
@@ -50,12 +77,62 @@ test("ratified defaults load without consumer configuration", async () => {
   assert.deepEqual(effective.config.referenceValidation.retrySeconds, [5, 15, 30]);
   assert.equal(effective.config.referenceValidation.timeoutSeconds, 60);
   assert.equal(effective.config.heartbeat.enabled, false);
+  assert.equal(effective.config.supervisor.idleTimeoutSeconds, 900);
   assert.equal(effective.config.retention.rawResponsesDays, 7);
   assert.equal(effective.config.retention.closedAssignmentsDays, 30);
   assert.equal(effective.config.retention.permanentArchiveDeletion, false);
   assert.equal(effective.config.execution.defaultInterruptionMode, "graceful");
   assert.equal(effective.config.execution.automaticForceEscalation, false);
+  assert.deepEqual(effective.config.integrations.jira, {
+    enabled: false,
+    mode: "disabled",
+    projectKeys: [],
+    workflowProfiles: [],
+    scrumAgent: {
+      enabled: false,
+      progressComments: true,
+      progressIntervalMinutes: 30,
+      timeTracking: "disabled",
+      estimateUpdates: "propose",
+    },
+  });
   assert.match(effective.digest, /^sha256:[a-f0-9]{64}$/);
+});
+
+test("Jira custom workflow profiles load while inconsistent activation fails closed", async () => {
+  const configured = await project({
+    ".agent-workflow/config.json": {
+      integrations: {
+        jira: {
+          enabled: true,
+          mode: "observe",
+          siteUrl: "https://example.atlassian.net",
+          credentialReference: "jira.default",
+          projectKeys: ["PAY"],
+          workflowProfiles: [{
+            id: "pay-story",
+            projectKey: "PAY",
+            issueTypes: ["Story"],
+            mappings: {
+              work_started: { targetStatus: "Development", authority: "automatic", fallback: "pending" },
+            },
+          }],
+          scrumAgent: { enabled: true, progressComments: true, progressIntervalMinutes: 20, timeTracking: "observe", estimateUpdates: "propose" },
+        },
+      },
+    },
+  });
+  const effective = await loadEffectiveConfiguration({ projectRoot: configured });
+  assert.equal(effective.config.integrations.jira.mode, "observe");
+  assert.equal(effective.config.integrations.jira.workflowProfiles[0]?.mappings.work_started?.targetStatus, "Development");
+
+  const inconsistent = await project({
+    ".agent-workflow/config.json": { integrations: { jira: { enabled: true, mode: "disabled" } } },
+  });
+  await assert.rejects(
+    loadEffectiveConfiguration({ projectRoot: inconsistent }),
+    (error) => errorCode(error) === "CONFIG_INVARIANT_VIOLATION",
+  );
 });
 
 test("precedence is defaults, project, assignment, executive, provider restriction", async () => {

@@ -82,6 +82,15 @@ test("conditional requirements are enforced", () => {
   assert.ok(result.errors.some((error) => error.instancePath === "/granted_at"));
 });
 
+test("route schemas constrain expected and observed values by source kind", () => {
+  const route = { schema_version: "1.0", record_id: "rte-example", record_type: "route", created_at: "2026-09-15T12:00:00Z", route_id: "rte-example", assignment_id: "asn-example", source_task_id: "tsk-source", source_kind: "execution", expected_value: "completed", target_task_id: "tsk-target", effect: "activate", state: "pending" };
+  assert.equal(coreSchemaRegistry.validateRecord("route", route).valid, true);
+  assert.equal(coreSchemaRegistry.validateRecord("route", { ...route, expected_value: "passed" }).valid, false);
+  assert.equal(coreSchemaRegistry.validateRecord("route", { ...route, gate_id: "qa" }).valid, false);
+  assert.equal(coreSchemaRegistry.validateRecord("route", { ...route, source_kind: "gate", expected_value: "passed" }).valid, false);
+  assert.equal(coreSchemaRegistry.validateRecord("route", { ...route, source_kind: "gate", gate_id: "qa", expected_value: "passed" }).valid, true);
+});
+
 test("duplicate core schema registration fails", () => {
   const registry = new SchemaRegistry();
   const schema = { $id: "https://example.test/duplicate", type: "object" };
