@@ -93,13 +93,17 @@ provider and is reported as `blocked` or `repair_required`.
 Start a Mission from Orbitkeep. Orbitkeep runs the selected provider headlessly,
 presents the generated Flight Plan, and keeps Executive approval in the parent
 control channel. After approval, execution transfers to an authenticated local
-supervisor and the launch command returns; the Mission continues if the terminal
+supervisor. Interactive terminals follow the normalized live event stream by
+default. Press `Ctrl+C` to detach the viewer without stopping the Mission, or
+use `--detach` to return immediately; the Mission continues if the terminal
 closes:
 
 ```sh
 npx orbitkeep mission start --provider claude
 # or
 npx orbitkeep mission start --provider codex
+# start without following live activity
+npx orbitkeep mission start --provider codex --detach
 ```
 
 Orbitkeep uses a discovery-only provider process to generate the Flight Plan.
@@ -119,6 +123,7 @@ the provider interface:
 ```sh
 npx orbitkeep mission status --provider codex
 npx orbitkeep mission logs --provider codex
+npx orbitkeep mission watch --provider codex
 npx orbitkeep mission accept --provider codex
 npx orbitkeep mission ask --provider codex --question "Why is this approach preferred?"
 npx orbitkeep mission steer --provider codex --instruction "Limit the change to the API package"
@@ -141,10 +146,11 @@ npx orbitkeep provider doctor --provider codex
 Orbitkeep resolves the applicable Mission, stable Flight Director identity, and
 ownership lease internally. When multiple Missions require a choice, structured
 automation may supply the advanced `missionId`; ordinary users select by
-objective and lifecycle. `mission status` reports durable background-job state,
-and `mission logs` replays the redacted normalized provider activity retained in
-`.agent-state`. A successful provider Run submits a Mission Report but does not
-approve its own work; review the report and use `mission accept` to accept it,
+objective and lifecycle. `mission watch` follows live normalized activity and
+reconnects after detachment, `mission status` reports durable background-job
+state, and `mission logs` replays the redacted normalized provider activity
+retained in `.agent-state`. A successful provider Run submits a Mission Report
+but does not approve its own work; review the report and use `mission accept` to accept it,
 close its Operations, and close the Mission. Pause, stop, and handover report an incomplete outcome rather
 than claiming success when the provider process cannot be confirmed stopped.
 
@@ -377,15 +383,16 @@ records the failure or unknown outcome for review and reconciliation.
   Claude and Codex Mission execution, an Orbitkeep-owned streaming CLI,
   provider-inaccessible Executive approvals, retirement of provider session
   launch, a user-focused `mission` command surface, detached execution under
-  an authenticated per-Silo supervisor, reconnectable status and retained
-  redacted logs, deterministic release
+  an authenticated per-Silo supervisor, an attached live event stream by
+  default with safe detach and `mission watch` reconnection, retained redacted
+  logs, deterministic release
   artifacts, durable Silo identity and health,
   deterministic dependency scheduling, quality gates, budgets, reusable
   workflows, Charter evaluation, Relay contracts and an in-memory reference
   transport, provider-neutral usage observations, and cross-platform
   qualification.
-- **v0.6 — Full CLI Mission Control and supervisor hardening:** multi-Mission
-  attach/watch operation, bounded replay, daemon crash and reboot recovery,
+- **v0.6 — Terminal Mission Control TUI and supervisor hardening:** a full-screen
+  multi-Mission interface, bounded replay, daemon crash and reboot recovery,
   optional OS login startup, richer
   Airlocks, Crew and Mission filtering, artifact inspection, and advanced
   local Telemetry.

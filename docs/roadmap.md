@@ -126,6 +126,10 @@ Scope:
 - Stream a minimum normalized activity feed covering provider messages, Crew
   dispatch, tool and command execution, results, failures, and usage while
   retaining redacted raw events only for configured diagnostic retention.
+- Follow that activity automatically in interactive terminals after Mission
+  launch. `Ctrl+C` detaches the viewer without stopping the Mission,
+  `--detach` opts out at launch, and `mission watch` reconnects later. Scripts,
+  redirected output, and `--json` remain non-blocking and detached.
 - Run approved provider execution beneath an authenticated per-Silo local
   supervisor so terminal exit only disconnects the user. Persist job state and
   normalized redacted activity for later status and log replay. Automatic OS
@@ -174,16 +178,16 @@ Release evidence is tracked in
 [release-qualification.md](release-qualification.md); configured automation is
 not treated as a passing platform result before it runs on the candidate SHA.
 
-## v0.6 — Full CLI Mission Control and supervisor hardening
+## v0.6 — Terminal Mission Control TUI and supervisor hardening
 
 Scope:
 
-- Expand the v0.5 streaming Mission CLI into a full interactive terminal
-  Mission Control with live Crew activity,
+- Expand the v0.5 streaming Mission CLI into a full-screen interactive terminal
+  Mission Control TUI with live Crew activity,
   tool and command execution, file changes, Run state, Airlock requests,
   Mission Reports, and estimated usage Telemetry.
 - Harden the v0.5 local supervisor for multiple concurrent Missions with
-  attach/watch sessions, bounded replay, daemon crash reconciliation, optional
+  multi-pane monitoring, bounded replay, daemon crash reconciliation, optional
   OS login startup, and reboot recovery without transferring live provider
   control.
 - Expand provider tool-permission requests into richer Orbitkeep Airlocks with

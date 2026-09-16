@@ -6,7 +6,7 @@ the exact release-candidate commit.
 
 | Qualification | Automation | Current evidence |
 | --- | --- | --- |
-| Windows, Node.js 24 | `npm run verify` on `windows-latest` | Local pre-commit run passed 780 tests, direct installed-hook execution, and packed-artifact checks on 2026-09-16; final candidate run pending |
+| Windows, Node.js 24 | `npm run verify` on `windows-latest` | Local pre-commit run passed 782 tests, direct installed-hook execution, and packed-artifact checks on 2026-09-16; final candidate run pending |
 | macOS, Node.js 24 | `npm run verify` on `macos-latest` | Pending final candidate run |
 | Linux, Node.js 24 | `npm run verify` on `ubuntu-latest` | Prior isolated Ubuntu/WSL pre-commit run passed 737 tests and packed-artifact checks on 2026-09-15; refreshed final candidate run pending |
 | Packed consumer | Real tarball install in a new temporary project | Enforced by `test:package` |

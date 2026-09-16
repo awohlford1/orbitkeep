@@ -20,11 +20,12 @@ import { ClaudeProviderAdapter } from "../providers/claude/index.ts";
 import { CodexProviderAdapter } from "../providers/codex/index.ts";
 import { persistRedactedRawResponse } from "../providers/index.ts";
 import { quarantineSubmission, readQuarantineSubmission, resolveQuarantine } from "../reconciliation/index.ts";
-import { acknowledgeHandover, bindBrokeredSession, controlStatus, currentMissionWork, flightPlanPrompt, getProviderManagerIdentity, handoverPackageId, inspectSupervisor, interruptBrokeredSessions, interruptControlledExecution, isBrokeredBootstrapOperation, isBrokeredManagementOperation, isBrokeredReadOnlyOperation, isHandoverAcknowledged, isParentOwnedLifecycleMutation, launchControlledCli, launchSupervisorJob, markResponseCaptureObserved, meaningfulMissionActivity, missionExecutionPrompt, parseGeneratedFlightPlan, readBrokeredSession, readSupervisorEvents, resolveBrokeredSession, runHeadlessProvider, serveSupervisor, shutdownSupervisor, supervisorJobs, type BrokeredSessionRecord, type HeadlessProviderEvent, type SessionProvider } from "../control/index.ts";
+import { acknowledgeHandover, bindBrokeredSession, controlStatus, currentMissionWork, flightPlanPrompt, getProviderManagerIdentity, handoverPackageId, inspectSupervisor, interruptBrokeredSessions, interruptControlledExecution, isBrokeredBootstrapOperation, isBrokeredManagementOperation, isBrokeredReadOnlyOperation, isHandoverAcknowledged, isParentOwnedLifecycleMutation, launchControlledCli, launchSupervisorJob, markResponseCaptureObserved, meaningfulMissionActivity, missionExecutionPrompt, parseGeneratedFlightPlan, readBrokeredSession, readSupervisorEvents, resolveBrokeredSession, runHeadlessProvider, serveSupervisor, shutdownSupervisor, summarizeMissionActivity, supervisorJobs, supervisorStatus, type BrokeredSessionRecord, type HeadlessProviderEvent, type SessionProvider } from "../control/index.ts";
 import type { NormalizedProviderSignal } from "../providers/claude/index.ts";
 import { captureGitWorkspaceSnapshot } from "../evidence/index.ts";
 import type { SignedExecutiveApprovalReceipt } from "../approvals/index.ts";
 import { formatCliOutput, selectOutputMode, type OutputMode } from "./presentation.ts";
+import { MissionEventCursor, shouldAttachMissionWatcher } from "./mission-watch.ts";
 import { assertSupportedRuntimeEnvironment } from "./runtime-environment.ts";
 import { JIRA_ACTION_AUTHORITIES, JIRA_TRANSITION_FALLBACKS, JIRA_WORK_INTENTS, JiraCloudReadClient, SystemJiraSecretStore, bindJiraTask, executeJiraIntent, inspectJiraWorkflow, jiraConfigurationHealthAsync, jiraKeychainReference, jiraTaskBinding, resolveJiraCredentialAsync, type JiraActionAuthority, type JiraTransitionFallback, type JiraWorkflowProfile, type JiraWorkIntent } from "../integrations/jira/index.ts";
 
@@ -697,6 +698,68 @@ async function missionLogs(root: string, input: Input): Promise<unknown> {
   return { status: "succeeded", code: "MISSION_LOGS_AVAILABLE", mission: missionProjection(selected.assignment), job, events, activity: meaningfulMissionActivity(events), currentWork: currentMissionWork(events), eventLimit: requestedLimit, ...(typeof final?.final_message === "string" ? { result: final.final_message } : {}) };
 }
 
+function watchEventRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function watchTime(value: string | undefined): string {
+  if (!value) return new Date().toLocaleTimeString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleTimeString();
+}
+
+function writeWatchActivity(events: readonly unknown[]): void {
+  for (const event of events) {
+    const activity = summarizeMissionActivity(event);
+    if (!activity) continue;
+    process.stdout.write(`${watchTime(activity.at)}  ${activity.label}${activity.detail ? ` — ${activity.detail}` : ""}\n`);
+  }
+}
+
+async function missionWatch(root: string, input: Input): Promise<unknown> {
+  if (activeOutputMode !== "human" || process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
+    throw Object.assign(new Error("Live Mission watching requires an interactive terminal. Use mission status or mission logs for automation."), { code: "MISSION_WATCH_TTY_REQUIRED" });
+  }
+  const selected = await missionContext(root, input, "status");
+  const jobs = await supervisorJobs(selected.stateRoot, selected.assignmentId);
+  const requested = input.jobId ?? option("job");
+  const initialJob = typeof requested === "string" ? jobs.find((candidate) => candidate.job_id === requested) : jobs[0];
+  if (!initialJob) {
+    if (selected.assignment.lifecycle === "awaiting_approval") {
+      return { status: "awaiting_approval", code: "APPROVAL_REQUIRED", mission: missionProjection(selected.assignment), nextStep: "Approve or reject the Flight Plan before watching execution." };
+    }
+    throw Object.assign(new Error("This Mission has no execution activity to watch."), { code: "MISSION_WATCH_EMPTY" });
+  }
+
+  const cursor = new MissionEventCursor(10); let initialized = false; let detached = false; let lastVisibleAt = Date.now(); let lastState = initialJob.state;
+  const detach = () => { detached = true; };
+  process.on("SIGINT", detach);
+  process.stdout.write(`\nWatching Mission\n  ${selected.assignment.objective}\n\nCtrl+C detaches this viewer; the Mission continues under the supervisor.\n\n`);
+  try {
+    while (!detached) {
+      const job = await supervisorStatus(selected.stateRoot, initialJob.job_id) ?? initialJob;
+      const events = await readSupervisorEvents(selected.stateRoot, initialJob.job_id, 1_000);
+      const fresh = cursor.take(events);
+      if (fresh.length > 0) { writeWatchActivity(fresh); lastVisibleAt = Date.now(); }
+      if (!initialized) {
+        const active = currentMissionWork(events);
+        for (const item of active) process.stdout.write(`${watchTime(item.startedAt)}  Active ${item.kind}: ${item.name}${item.detail ? ` — ${item.detail}` : ""}\n`);
+        initialized = true;
+      }
+      if (job.state !== lastState) { process.stdout.write(`${watchTime(job.updated_at)}  Mission state — ${job.state}\n`); lastState = job.state; lastVisibleAt = Date.now(); }
+      if (["completed", "failed", "interrupted"].includes(job.state)) {
+        process.stdout.write(`\n${job.state === "completed" ? "✓" : "!"} Mission ${job.state}.\n\n`);
+        return missionLogs(root, { provider: selected.provider, missionId: selected.assignmentId, jobId: initialJob.job_id, limit: 1_000 });
+      }
+      if (Date.now() - lastVisibleAt >= 30_000) { process.stdout.write(`${new Date().toLocaleTimeString()}  Still working — no new provider activity.\n`); lastVisibleAt = Date.now(); }
+      await new Promise((resolve) => setTimeout(resolve, 750));
+    }
+    return { status: "detached", code: "MISSION_WATCH_DETACHED", mission: missionProjection(selected.assignment), job: { id: initialJob.job_id, state: lastState }, nextStep: `Reconnect with \`npx orbitkeep mission watch --provider ${selected.provider}\`.` };
+  } finally {
+    process.removeListener("SIGINT", detach);
+  }
+}
+
 async function missionAsk(root: string, input: Input): Promise<unknown> {
   const questionValue = input.question ?? option("question");
   const question = typeof questionValue === "string" && questionValue.trim() ? questionValue.trim() : process.stdin.isTTY ? await promptText("Question: ") : "";
@@ -1217,7 +1280,7 @@ export async function runCli(): Promise<void> {
     "setup", "init", "install --status|--recover|--rollback", "repair --plan|--apply", "doctor", "validate", "capabilities", "config show", "config validate", "upgrade --check|--plan|--apply|--status|--rollback", "--json|--verbose|--quiet", "--redact-output",
     "jira configure [--site-url URL] [--project-key KEY] [--email EMAIL]", "jira workflow-setup [--issue PROJECT-123] [--intent INTENT]", "jira enable-writes", "jira bind (manager JSON input)", "jira sync (manager JSON input)", "jira doctor [--issue PROJECT-123]",
     "cleanup --dry-run|--apply", "archive --dry-run|--apply",
-    "mission start|list|status|logs|accept|ask|steer|pause|resume|stop|cancel|handover --provider claude|codex",
+    "mission start|list|status|logs|watch|accept|ask|steer|pause|resume|stop|cancel|handover --provider claude|codex",
     "supervisor status|stop [--force]", "provider doctor --provider claude|codex",
     "silo status|derive",
   ] }); return; }
@@ -1293,10 +1356,18 @@ export async function runCli(): Promise<void> {
   if (command === "archive") { output(await archiveCommand(root, await jsonInput(), process.argv.includes("--apply") ? "apply" : "dry-run")); return; }
   if (command === "supervisor") { output(await supervisorCommand(root, subcommand, await jsonInput())); return; }
   if (command === "mission") {
-    if (subcommand === "start") { output(await missionStart(root, await jsonInput())); return; }
+    if (subcommand === "start") {
+      const input = await jsonInput(); const started = await missionStart(root, input);
+      const value = watchEventRecord(started); const mission = watchEventRecord(value.mission);
+      const attach = shouldAttachMissionWatcher({ mode: activeOutputMode, stdinIsTTY: process.stdin.isTTY, stdoutIsTTY: process.stdout.isTTY, detach: process.argv.includes("--detach"), result: started });
+      output(attach ? { ...value, watching: true } : started);
+      if (attach) output(await missionWatch(root, { provider: input.provider ?? option("provider"), missionId: mission.assignmentId }));
+      return;
+    }
     if (subcommand === "list") { output(await missionList(root)); return; }
     if (subcommand === "status") { output(await missionStatus(root, await jsonInput())); return; }
     if (subcommand === "logs") { output(await missionLogs(root, await jsonInput())); return; }
+    if (subcommand === "watch") { output(await missionWatch(root, await jsonInput())); return; }
     if (subcommand === "accept") { output(await missionAccept(root, await jsonInput())); return; }
     if (subcommand === "ask") { output(await missionAsk(root, await jsonInput())); return; }
     if (subcommand === "steer") { output(await missionSteer(root, await jsonInput())); return; }
@@ -1304,7 +1375,7 @@ export async function runCli(): Promise<void> {
     if (subcommand === "stop" || subcommand === "cancel") { output(await missionStop(root, await jsonInput())); return; }
     if (subcommand === "resume") { output(await missionResume(root, await jsonInput())); return; }
     if (subcommand === "handover") { output(await missionHandover(root, await jsonInput())); return; }
-    throw new Error("Unknown Mission command. Supported: mission start, mission list, mission status, mission logs, mission accept, mission ask, mission steer, mission pause, mission resume, mission stop, mission cancel, mission handover");
+    throw new Error("Unknown Mission command. Supported: mission start, mission list, mission status, mission logs, mission watch, mission accept, mission ask, mission steer, mission pause, mission resume, mission stop, mission cancel, mission handover");
   }
   if (command === "provider") {
     if (subcommand === "doctor") { output(await providerDoctor(root, missionProvider(await jsonInput()))); return; }

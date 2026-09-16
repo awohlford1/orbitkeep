@@ -16,6 +16,9 @@ public API when the migration is documented.
 - Provider-neutral `mission` controls for planning, approval, status, logs,
   questions, steering, pause, resume, stop, handover, and explicit Executive
   Mission Report acceptance and closure.
+- An attached live Mission event stream for interactive terminals, with
+  `--detach` launch behavior, safe `Ctrl+C` viewer detachment, and reconnectable
+  `mission watch` operation while the supervisor continues owning execution.
 - Read-only `provider doctor` diagnostics for integration, executable,
   authentication, headless streaming, event normalization, and permission
   control readiness without exposing provider account details.

@@ -59,7 +59,13 @@ sequentially to avoid exhausting the operating-system file limit.
 npx orbitkeep mission status --provider claude
 npx orbitkeep mission logs --provider claude
 npx orbitkeep mission logs --provider claude --limit 250
+npx orbitkeep mission watch --provider claude
 ```
+
+Interactive Mission launches follow activity automatically. If you detached
+with `Ctrl+C`, used `--detach`, or closed the terminal, `mission watch`
+reconnects to the current Mission. Detaching the viewer does not stop the
+supervisor or provider process.
 
 Normal activity logs are separate from opt-in raw provider-response capture.
 Existing legacy files are preserved until the configured cleanup process

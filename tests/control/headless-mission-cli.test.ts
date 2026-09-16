@@ -179,7 +179,7 @@ test("mission start owns planning, approval, and headless execution outside the 
   const helpResult = await run(root, environment, ["help"], {});
   assert.equal(helpResult.code, 0, `${helpResult.stderr}\n${helpResult.stdout}`);
   const help = JSON.parse(helpResult.stdout) as { commands: string[] };
-  assert.ok(help.commands.some((command) => command.startsWith("mission start|list|status|logs|accept|ask|steer|pause|resume|stop|cancel|handover")));
+  assert.ok(help.commands.some((command) => command.startsWith("mission start|list|status|logs|watch|accept|ask|steer|pause|resume|stop|cancel|handover")));
   assert.ok(help.commands.includes("supervisor status|stop [--force]"));
   assert.ok(help.commands.includes("provider doctor --provider claude|codex"));
   assert.equal(help.commands.some((command) => command.includes("session launch")), false);

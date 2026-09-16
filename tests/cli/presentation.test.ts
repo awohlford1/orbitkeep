@@ -74,10 +74,16 @@ test("Silo status and derivation have concise human projections", () => {
 test("detached Missions explain background execution and reconnectable logs", () => {
   const launched = formatCliOutput({ command: "mission", mode: "human", value: { status: "running", code: "MISSION_RUNNING_IN_BACKGROUND", mission: { objective: "Inspect safely" }, provider: { name: "codex" }, job: { state: "queued" } } });
   assert.match(launched?.text ?? "", /Mission launched/);
-  assert.match(launched?.text ?? "", /close this terminal/);
-  assert.match(launched?.text ?? "", /mission logs/);
+  assert.match(launched?.text ?? "", /Detached from live activity/);
+  assert.match(launched?.text ?? "", /mission watch/);
   assert.match(launched?.text ?? "", /mission stop --provider codex/);
   assert.match(launched?.text ?? "", /supervisor stop/);
+  const attached = formatCliOutput({ command: "mission", mode: "human", value: { status: "running", code: "MISSION_RUNNING_IN_BACKGROUND", watching: true, mission: { objective: "Inspect safely" }, provider: { name: "codex" }, job: { state: "queued" } } });
+  assert.match(attached?.text ?? "", /Following live activity/);
+  assert.match(attached?.text ?? "", /Ctrl\+C to detach/);
+  const detached = formatCliOutput({ command: "mission", mode: "human", value: { status: "detached", code: "MISSION_WATCH_DETACHED", mission: { objective: "Inspect safely" }, job: { state: "running" }, nextStep: "Reconnect now." } });
+  assert.match(detached?.text ?? "", /Detached from Mission activity/);
+  assert.match(detached?.text ?? "", /Reconnect now/);
   const logs = formatCliOutput({ command: "mission", mode: "human", value: { code: "MISSION_LOGS_AVAILABLE", mission: { objective: "Inspect safely" }, job: { state: "completed" }, events: [{ kind: "tool_started", source_type: "Read" }, { kind: "result", data: { result: "Finished safely" } }], activity: [{ label: "Read started", detail: "Inspect package manifest", at: "2026-01-01T00:00:00.000Z" }], result: "Finished safely" } });
   assert.match(logs?.text ?? "", /Mission activity loaded/);
   assert.match(logs?.text ?? "", /Recent meaningful activity/);

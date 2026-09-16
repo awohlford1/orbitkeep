@@ -68,7 +68,7 @@ production availability guarantees.
 
 ### Stage 1: v0.5 Silo, workflow, and headless execution foundations
 
-This is the immediate product priority and contains seven coordinated tracks:
+This is the immediate product priority and contains nine coordinated tracks:
 
 1. **Silo identity and lifecycle:** durable identity, optional Keep and Colony
    membership, registration, capabilities, health, disconnection, degradation,
@@ -95,6 +95,11 @@ This is the immediate product priority and contains seven coordinated tracks:
    authenticated per-Silo local supervisor. The launching terminal may exit;
    durable job status and seven-day retained, redacted activity remain
    available through `mission status` and `mission logs`.
+9. **Attached live Mission stream:** an interactive `mission start` follows
+   normalized provider activity by default while the detached supervisor
+   retains ownership. `Ctrl+C` detaches only the viewer, `--detach` returns
+   immediately, and `mission watch` reconnects without requiring users to poll
+   status or logs. JSON and non-interactive callers remain detached.
 
 The stage is complete only when a Silo remains fully functional locally and
 all new distributed metadata can be migrated without weakening governance. A
@@ -102,14 +107,14 @@ basic Mission must also complete through both headless providers with
 Orbitkeep-owned planning, approval, detached execution, reconnectable activity,
 result handling, and cleanup.
 
-### Stage 2: v0.6 full CLI Mission Control and local supervisor
+### Stage 2: v0.6 terminal Mission Control TUI and supervisor hardening
 
-Expand the v0.5 local-supervisor foundation into a full terminal Mission
-Control with attach/watch sessions, multiple concurrent Missions, bounded
-replay, daemon crash reconciliation, optional OS login startup, richer
-Airlock decisions, Crew and Mission filtering, Flight Recorder exploration,
-result and artifact inspection, and advanced local Telemetry. Complete removal
-of the temporary `session launch` compatibility tombstone in this stage.
+Expand the v0.5 live-streaming CLI into a full-screen terminal Mission Control
+TUI with multiple concurrent Mission views, bounded replay, daemon crash
+reconciliation, optional OS login startup, richer Airlock decisions, Crew and
+Mission filtering, Flight Recorder exploration, result and artifact
+inspection, and advanced local Telemetry. Complete removal of the temporary
+`session launch` compatibility tombstone in this stage.
 
 ### Stage 3: v0.7 Mission Modules and Airlocks
 
@@ -239,10 +244,10 @@ The next implementation specifications cover v0.5 only. The first draft is the
 [Silo identity and lifecycle specification](https://github.com/awohlford1/orbitkeep/blob/main/docs/specifications/v0.5-silo-identity-lifecycle.md).
 The implemented release-stabilization baseline is documented in the
 [session broker and release integrity specification](https://github.com/awohlford1/orbitkeep/blob/main/docs/specifications/v0.5-session-broker-release-integrity.md).
-The headless Claude and Codex adapters, minimum streaming Mission CLI,
+The headless Claude and Codex adapters, attached live Mission stream,
 Executive control-channel separation, `session launch` retirement, and public
-CLI cleanup are v0.5 release blockers. Full terminal Mission Control remains a
-v0.6 deliverable. Docker Module execution moves to v0.7, Redis deployment and
+CLI cleanup are v0.5 release blockers. The full-screen terminal Mission Control
+TUI remains a v0.6 deliverable. Docker Module execution moves to v0.7, Redis deployment and
 remote runners move to v0.8, and graphical Mission Control moves to v0.9. This
 sequence provides a usable v0.5 without allowing later presentation layers to
 dictate unfinished Core semantics.

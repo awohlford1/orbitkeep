@@ -120,10 +120,14 @@ function missionSummary(value: unknown): string[] {
   ];
   if (result.code === "MISSION_RUNNING_IN_BACKGROUND") return [
     "✓ Mission launched", "", `Objective: ${label(mission.objective)}`, `Provider: ${label(object(result.provider).name)}`,
-    `Background job: ${label(job.state, "queued")}`, "", "You may close this terminal. The Mission will continue under the local Orbitkeep supervisor.",
-    "Monitor: use `npx orbitkeep mission status` or `npx orbitkeep mission logs`.",
+    `Background job: ${label(job.state, "queued")}`, "", result.watching === true ? "Following live activity. Press Ctrl+C to detach; the Mission will continue." : "Detached from live activity. The Mission continues under the local Orbitkeep supervisor.",
+    result.watching === true ? "" : "Reconnect with `npx orbitkeep mission watch`.",
     `Stop this Mission: \`npx orbitkeep mission stop --provider ${label(object(result.provider).name, "claude|codex")}\`.`,
     "Supervisor control: use `npx orbitkeep supervisor status` or `npx orbitkeep supervisor stop`.",
+  ];
+  if (result.code === "MISSION_WATCH_DETACHED") return [
+    "- Detached from Mission activity", "", `Mission: ${label(mission.objective, label(mission.missionId))}`, `Job: ${label(job.state)}`,
+    "The Mission is still owned by the Orbitkeep supervisor.", "", typeof result.nextStep === "string" ? result.nextStep : "Reconnect with `npx orbitkeep mission watch`.",
   ];
   if (result.code === "MISSION_LOGS_AVAILABLE") {
     const events = Array.isArray(result.events) ? result.events : []; const activity = Array.isArray(result.activity) ? result.activity.map(object) : []; const work = Array.isArray(result.currentWork) ? result.currentWork.map(object) : [];

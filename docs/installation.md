@@ -24,6 +24,12 @@ npx orbitkeep mission start --provider claude
 npx orbitkeep mission start --provider codex
 ```
 
+In an interactive terminal, Mission launch follows meaningful provider, Crew,
+tool, and process activity until completion. Press `Ctrl+C` to detach the
+viewer without stopping execution, pass `--detach` to return immediately, or
+run `npx orbitkeep mission watch --provider claude|codex` to reconnect later.
+JSON and non-interactive callers always remain detached.
+
 Direct provider sessions are not Orbitkeep Missions and do not possess the
 broker capability required by the blocking hook.
 
@@ -49,16 +55,17 @@ project-owned hooks.
 After approval, execution runs under Orbitkeep's authenticated per-Silo local
 supervisor, so it is not owned by the terminal that launched it. Closing that
 terminal disconnects the user without stopping the provider. Use `orbitkeep
-mission status` to reconnect to durable job state and `orbitkeep mission logs`
-to replay redacted normalized activity. This release does not yet configure an
-OS login service, so a machine reboot still requires explicit recovery.
+mission watch` to reconnect to live activity, `orbitkeep mission status` for a
+durable snapshot, and `orbitkeep mission logs` to replay redacted normalized
+activity. This release does not yet configure an OS login service, so a machine
+reboot still requires explicit recovery.
 
 After a successful Run, review the submitted Mission Report with `orbitkeep
 mission logs`, then run `orbitkeep mission accept --provider claude|codex` to
 accept the report and close the Mission. Providers cannot invoke this parent
 control action or accept their own output.
 
-After a Mission starts, use `orbitkeep mission status`, `mission logs`, `mission accept`, `mission ask`,
+After a Mission starts, use `orbitkeep mission watch`, `mission status`, `mission logs`, `mission accept`, `mission ask`,
 `mission steer`, `mission pause`, `mission resume`, `mission stop`, and `mission handover` from
 the parent terminal. Each command takes `--provider claude|codex`; handover also
 takes `--to claude|codex`. Orbitkeep keeps assignment identifiers and ownership
