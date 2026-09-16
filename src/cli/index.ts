@@ -1164,6 +1164,11 @@ async function observeProvider(root: string, provider: string, input: Input) {
     });
   }
   if (hookOutput !== undefined) return hookOutput;
+  // Claude command hooks must remain silent unless they are returning a
+  // documented control decision. SessionStart stdout is injected into model
+  // context, and unsupported Stop/PostToolUse fields can surface as hook
+  // feedback. The durable acknowledgement is already persisted above.
+  if (provider === "claude") return {};
   return {
     accepted: true,
     classification: "observed",

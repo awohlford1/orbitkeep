@@ -38,6 +38,12 @@ public API when the migration is documented.
   users remain in Orbitkeep's parent control channel.
 - Setup, repair, and upgrade use transactional installation behavior and
   human-readable terminal output with explicit `--json` automation output.
+- Headless Claude Missions use an Orbitkeep-owned isolated settings source, so
+  preserved repository hooks cannot block or replace managed provider output;
+  diagnostics report both managed and project hook sets.
+- Observational Claude hooks now persist their acknowledgements silently and
+  emit stdout only for documented permission decisions, preventing hook audit
+  metadata from entering provider context or replacing final responses.
 
 ### Security
 

@@ -33,6 +33,7 @@ const digest = (content: string) => `sha256:${createHash("sha256").update(conten
 export async function expectedManagedFiles(packageRoot = fileURLToPath(new URL("../../", import.meta.url))): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
   files[".agent-workflow/codex-manager.md"] = await readFile(path.join(packageRoot, "integrations", "codex", "MANAGER.template.md"), "utf8");
+  files[".agent-workflow/providers/claude/settings.json"] = `${JSON.stringify(await claudeHookTemplate(packageRoot), null, 2)}\n`;
   for (const contract of ["README.md", "MANAGER.md", "CONTRACTS.md", "ROLES.md"]) files[`.agent-workflow/contracts/${contract}`] = await readFile(path.join(packageRoot, "contracts", contract), "utf8");
   for (const role of (await loadRoleCatalogue()).roles) {
     files[`.claude/agents/${role.id}.md`] = renderClaude(role);
@@ -114,7 +115,8 @@ const CLAUDE_REFERENCE = `${CLAUDE_BLOCK_START}\n${CLAUDE_MARKER}\n\nFollow the 
 
 async function claudeHookTemplate(packageRoot: string): Promise<{ hooks: Record<string, unknown> }> {
   const template = await readFile(path.join(packageRoot, "integrations", "claude", "hooks.template.json"), "utf8");
-  return JSON.parse(template.replaceAll("{{agentWorkflowCommand}} provider claude hook --json", CLAUDE_HOOK_COMMAND)) as { hooks: Record<string, unknown> };
+  const parsed = JSON.parse(template.replaceAll("{{agentWorkflowCommand}} provider claude hook --json", CLAUDE_HOOK_COMMAND)) as { hooks: Record<string, unknown> };
+  return { hooks: parsed.hooks };
 }
 
 type ManagedFileManifest = { managed?: Record<string, string> };
@@ -270,6 +272,7 @@ export async function performInstallConsumer(projectRoot: string): Promise<Insta
   await mkdir(path.join(root, ".agent-workflow", "overrides"), { recursive: true });
   const hooks = await claudeHookTemplate(packageRoot);
   await installClaudeHooks(path.join(root, ".claude", "settings.json"), hooks, created, preserved);
+  await writeManagedFrameworkAsset(root, ".agent-workflow/providers/claude/settings.json", `${JSON.stringify(hooks, null, 2)}\n`, priorManagedManifest, created, preserved);
   const codexTemplate = await readFile(path.join(packageRoot, "integrations", "codex", "MANAGER.template.md"), "utf8");
   await writeManagedFrameworkAsset(root, ".agent-workflow/codex-manager.md", codexTemplate, priorManagedManifest, created, preserved);
   for (const contract of ["README.md", "MANAGER.md", "CONTRACTS.md", "ROLES.md"]) {

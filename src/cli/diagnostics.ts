@@ -37,19 +37,31 @@ export async function providerCliRuntime(command: "claude" | "codex", environmen
   return { command, available: false };
 }
 
-export interface ClaudeHookInspection { valid: boolean; missing: string[]; mismatched: string[] }
+export interface ClaudeHookInspection { valid: boolean; missing: string[]; mismatched: string[]; additional: string[] }
+
+function hookHandlers(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.flatMap(hookHandlers);
+  if (value === null || typeof value !== "object") return [];
+  const item = value as Record<string, unknown>;
+  if (typeof item.type === "string") return [item];
+  return Object.values(item).flatMap(hookHandlers);
+}
 
 export async function inspectClaudeHooks(filename: string): Promise<ClaudeHookInspection> {
-  const missing: string[] = []; const mismatched: string[] = [];
+  const missing: string[] = []; const mismatched: string[] = []; const additional: string[] = [];
   try {
     const value = JSON.parse(await readFile(filename, "utf8")) as { hooks?: Record<string, unknown> };
     for (const eventName of CLAUDE_HOOK_EVENTS) {
       const entries = value.hooks?.[eventName];
-      if (!Array.isArray(entries) || !JSON.stringify(entries).includes("provider claude hook")) missing.push(eventName);
-      else if (!JSON.stringify(entries).includes(PINNED_AGENT_WORKFLOW_COMMAND)) mismatched.push(eventName);
+      const handlers = hookHandlers(entries);
+      const managed = handlers.filter((handler) => typeof handler.command === "string" && handler.command.includes("provider claude hook"));
+      const expectedCommand = `${PINNED_AGENT_WORKFLOW_COMMAND} provider claude hook --json`;
+      if (!Array.isArray(entries) || managed.length === 0) missing.push(eventName);
+      else if (!managed.some((handler) => handler.command === expectedCommand)) mismatched.push(eventName);
+      if (handlers.some((handler) => handler.type !== "command" || handler.command !== expectedCommand)) additional.push(eventName);
     }
   } catch { missing.push(...CLAUDE_HOOK_EVENTS); }
-  return { valid: missing.length === 0 && mismatched.length === 0, missing, mismatched };
+  return { valid: missing.length === 0 && mismatched.length === 0, missing, mismatched, additional };
 }
 
 async function hasCodexIntegration(filename: string): Promise<boolean> {
@@ -139,7 +151,8 @@ export async function doctor(projectRoot: string) {
   try { effective = await loadEffectiveConfiguration({ projectRoot, requireProjectConfig: true }); } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
   let stateRoot = path.join(projectRoot, ".agent-state");
   try { stateRoot = (await resolveStatePaths(projectRoot, effective?.config.state.directory)).stateRoot; } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
-  const claudeHooks = await inspectClaudeHooks(path.join(projectRoot, ".claude", "settings.json"));
+  const projectClaudeHooks = await inspectClaudeHooks(path.join(projectRoot, ".claude", "settings.json"));
+  const claudeHooks = await inspectClaudeHooks(path.join(projectRoot, ".agent-workflow", "providers", "claude", "settings.json"));
   const codexIntegrated = await hasCodexIntegration(path.join(projectRoot, "AGENTS.md"));
   const claudeIntegrated = await hasClaudeIntegration(path.join(projectRoot, "CLAUDE.md"));
   const providerRuntime = {
@@ -149,6 +162,7 @@ export async function doctor(projectRoot: string) {
   if ((effective?.config.providers.claude?.enabled ?? false) && !providerRuntime.claude.available) warnings.push("Claude integration is installed, but the `claude` CLI is not available on PATH.");
   if ((effective?.config.providers.codex?.enabled ?? false) && !providerRuntime.codex.available) warnings.push("Codex integration is installed, but the `codex` CLI is not available on PATH.");
   if ((effective?.config.providers.claude?.enabled ?? false) && !claudeHooks.valid) warnings.push(`Claude hook integration is incomplete (missing: ${claudeHooks.missing.join(", ") || "none"}; unpinned: ${claudeHooks.mismatched.join(", ") || "none"}).`);
+  if ((effective?.config.providers.claude?.enabled ?? false) && projectClaudeHooks.additional.length) warnings.push(`Additional project Claude hooks were detected for ${projectClaudeHooks.additional.join(", ")}. Orbitkeep Missions exclude project settings and use isolated managed hooks; bare Claude sessions remain subject to the project hooks.`);
   if ((effective?.config.providers.codex?.enabled ?? false) && !codexIntegrated) warnings.push("Codex manager instructions do not reference the pinned Orbitkeep CLI.");
   const requiredContracts = ["README.md", "MANAGER.md", "CONTRACTS.md", "ROLES.md"];
   const missingContracts = (await Promise.all(requiredContracts.map(async (name) => await exists(path.join(projectRoot, ".agent-workflow", "contracts", name)) ? undefined : name))).filter((name): name is string => name !== undefined);
@@ -257,10 +271,10 @@ export async function doctor(projectRoot: string) {
   const capabilities = await capabilityReport({ claudeBlockingHook: claudeHooks.valid, claudeWorkflowAuthorizationConnected: claudeHooks.valid });
   const supervisor = await inspectSupervisor(stateRoot);
   return {
-    healthy: errors.length === 0, frameworkVersion: FRAMEWORK_VERSION, configurationSchemaVersion: SUPPORTED_SCHEMA_VERSION, recordSchemaVersion: SUPPORTED_SCHEMA_VERSION, eventSchemaVersion: SUPPORTED_SCHEMA_VERSION,
+    healthy: activation === "active" || activation === "active_limited", frameworkVersion: FRAMEWORK_VERSION, configurationSchemaVersion: SUPPORTED_SCHEMA_VERSION, recordSchemaVersion: SUPPORTED_SCHEMA_VERSION, eventSchemaVersion: SUPPORTED_SCHEMA_VERSION,
     configurationDigest: effective?.digest, stateRoot, stateRootSafety: { contained: !path.relative(projectRoot, stateRoot).startsWith(".."), gitignored: stateRootIgnored, ignoredPath },
     enabledProviders: Object.entries(effective?.config.providers ?? {}).filter(([, value]) => value.enabled).map(([name]) => name).sort(),
-    activation, silo, supervisor, providerActivation: providerStatuses, providerRuntime, repair: managedRepair, integrations: { claude: claudeHooks.valid, codex: codexIntegrated }, hookInspection: { claude: claudeHooks }, capabilities,
+    activation, silo, supervisor, providerActivation: providerStatuses, providerRuntime, repair: managedRepair, integrations: { claude: claudeHooks.valid, codex: codexIntegrated }, hookInspection: { claude: claudeHooks, claudeProject: projectClaudeHooks }, missionIsolation: { claude: { enabled: claudeHooks.valid, settingSources: [], settingsPath: ".agent-workflow/providers/claude/settings.json" } }, capabilities,
     contracts: { valid: missingContracts.length === 0, missing: missingContracts },
     roles: { valid: unknownRoles.length === 0 && missingRoleAdapters.length === 0 && roleGeneration.valid, configured: configuredRoles, unknown: unknownRoles, missingAdapters: missingRoleAdapters, drift: roleGeneration.mismatches },
     schemas: { registryComplete, recordTypes: coreSchemaRegistry.recordTypes().length, eventTypes: coreSchemaRegistry.eventTypes().length, extensions: Object.keys(effective?.extensions ?? {}) },
@@ -306,9 +320,35 @@ async function providerAuthentication(provider: SessionProvider, environment: No
   });
 }
 
+async function providerHeadlessCompatibility(provider: SessionProvider, environment: NodeJS.ProcessEnv): Promise<{ supported: boolean; reason: string }> {
+  let resolved: Awaited<ReturnType<typeof resolveProviderExecutable>>;
+  try { resolved = await resolveProviderExecutable(provider, environment); }
+  catch { return { supported: false, reason: `The ${provider} CLI executable could not be resolved.` }; }
+  const args = provider === "claude" ? ["--help"] : ["exec", "--help"];
+  return new Promise((resolve) => {
+    const child = spawn(resolved.executable, args, { env: environment, windowsHide: true, shell: resolved.shell, stdio: ["ignore", "pipe", "pipe"] });
+    let output = ""; let settled = false;
+    const finish = (value: { supported: boolean; reason: string }) => { if (settled) return; settled = true; clearTimeout(timer); resolve(value); };
+    const timer = setTimeout(() => { child.kill(); finish({ supported: false, reason: `The ${provider} headless capability probe timed out.` }); }, 5_000);
+    timer.unref();
+    const capture = (chunk: string) => { if (output.length < 128 * 1024) output += chunk.slice(0, 128 * 1024 - output.length); };
+    child.stdout?.setEncoding("utf8"); child.stdout?.on("data", capture);
+    child.stderr?.setEncoding("utf8"); child.stderr?.on("data", capture);
+    child.once("error", () => finish({ supported: false, reason: `The ${provider} headless capability probe could not start.` }));
+    child.once("close", (code) => {
+      const required = provider === "claude" ? ["--setting-sources", "--settings", "--output-format"] : ["--json", "--sandbox"];
+      const missing = required.filter((flag) => !output.includes(flag));
+      finish(code === 0 && missing.length === 0
+        ? { supported: true, reason: `The installed ${provider} CLI exposes Orbitkeep's required headless options.` }
+        : { supported: false, reason: code !== 0 ? `The ${provider} headless capability probe exited with code ${code}.` : `The installed ${provider} CLI is missing required options: ${missing.join(", ")}.` });
+    });
+  });
+}
+
 export async function providerDoctor(projectRoot: string, provider: SessionProvider, environment: NodeJS.ProcessEnv = process.env) {
   const effective = await loadEffectiveConfiguration({ projectRoot, requireProjectConfig: true });
-  const hooks = await inspectClaudeHooks(path.join(projectRoot, ".claude", "settings.json"));
+  const projectHooks = await inspectClaudeHooks(path.join(projectRoot, ".claude", "settings.json"));
+  const hooks = await inspectClaudeHooks(path.join(projectRoot, ".agent-workflow", "providers", "claude", "settings.json"));
   const integrations = { claude: await hasClaudeIntegration(path.join(projectRoot, "CLAUDE.md")), codex: await hasCodexIntegration(path.join(projectRoot, "AGENTS.md")) };
   const policy = effective.config.providers[provider];
   const activation = assessProviderActivation(provider, policy?.enabled ?? false, policy?.requiredMode, integrations, hooks);
@@ -316,16 +356,17 @@ export async function providerDoctor(projectRoot: string, provider: SessionProvi
   try { await resolveProviderExecutable(provider, environment); } catch { executableAvailable = false; }
   if (executableAvailable) executableAvailable = (await providerCliRuntime(provider, environment)).available || Boolean(environment[`ORBITKEEP_${provider.toUpperCase()}_EXECUTABLE`]);
   const authentication = executableAvailable ? await providerAuthentication(provider, environment) : { state: "unavailable" as const, reason: `The ${provider} CLI is not available.` };
+  const headlessCompatibility = executableAvailable ? await providerHeadlessCompatibility(provider, environment) : { supported: false, reason: `The ${provider} CLI is not available.` };
   const capabilities = await capabilityReport({ claudeBlockingHook: hooks.valid, claudeWorkflowAuthorizationConnected: hooks.valid });
   const permissionControl = provider === "claude"
     ? { state: hooks.valid ? "enforced" : "repair_required", reason: hooks.valid ? "Claude blocking hooks are installed and connected to workflow authorization." : "Claude blocking hooks are incomplete." }
     : { state: integrations.codex ? "instructed" : "repair_required", reason: integrations.codex ? "Codex Flight Director instructions are installed; native universal tool blocking is not claimed." : "Codex Flight Director instructions are missing." };
   const invocation = buildHeadlessProviderInvocation(provider, "execute", projectRoot);
-  const ready = activation.status === "active" && executableAvailable && authentication.state === "authenticated" && permissionControl.state !== "repair_required";
+  const ready = activation.status === "active" && executableAvailable && authentication.state === "authenticated" && headlessCompatibility.supported && permissionControl.state !== "repair_required";
   return {
     status: ready ? "ready" : "attention_required", provider, activation,
     runtime: { available: executableAvailable }, authentication,
-    headlessExecution: { supported: true, transport: "jsonl", mode: provider === "claude" ? "print" : "exec", workingDirectory: invocation.cwd },
+    headlessExecution: { supported: headlessCompatibility.supported, reason: headlessCompatibility.reason, transport: "jsonl", mode: provider === "claude" ? "print" : "exec", workingDirectory: invocation.cwd, ...(provider === "claude" ? { isolatedSettings: hooks.valid, additionalProjectHookEvents: projectHooks.additional } : {}) },
     eventStreaming: { supported: true, normalized: true }, permissionControl,
     capabilities: capabilities.providers[provider],
   };

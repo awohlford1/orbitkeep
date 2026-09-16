@@ -38,6 +38,14 @@ The provider diagnostic is read-only. It reports integration, executable,
 authentication, headless-streaming, and permission-control readiness without
 printing provider account details or credential material.
 
+For Claude, Orbitkeep installs a separate managed settings file under
+`.agent-workflow/providers/claude/`. Headless Missions explicitly load that file
+with repository and user setting sources disabled, so existing project hooks
+cannot alter the managed Mission. The original `.claude/settings.json` remains
+intact except for Orbitkeep's own additive direct-session enforcement hooks.
+`doctor --json` reports both hook sets and lists lifecycle events that also have
+project-owned hooks.
+
 After approval, execution runs under Orbitkeep's authenticated per-Silo local
 supervisor, so it is not owned by the terminal that launched it. Closing that
 terminal disconnects the user without stopping the provider. Use `orbitkeep
@@ -88,7 +96,8 @@ developer preview only and is reported as degraded by diagnostics.
 
 The result is:
 
-- `ready`: all required integration is active.
+- `ready`: all required local integration is active. Run `provider doctor` for
+  the selected provider's executable and authentication readiness.
 - `attention_required`: installation completed, but one or more health checks
   needs attention. Read `health.errors`, then run `repair --plan`.
 - `failed`: no successful setup was produced. The transaction automatically
@@ -107,6 +116,9 @@ npx orbitkeep doctor
 Malformed user-owned JSON is never overwritten. Correct it manually and rerun
 the plan. Framework markers let repair update only framework-owned blocks in
 shared files.
+
+Additional Claude hooks are preserved and reported. They do not run inside an
+Orbitkeep-managed headless Mission because its provider settings are isolated.
 
 ## Alternate package sources
 

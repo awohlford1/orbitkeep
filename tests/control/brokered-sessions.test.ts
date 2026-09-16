@@ -114,6 +114,22 @@ test("Claude planner sessions are discovery-only and cannot bootstrap workflow m
   assert.match((await hook("Write", { file_path: "README.md", content: "denied" })).stdout, /WORKFLOW_PLANNING_READ_ONLY/);
 });
 
+test("non-decision Claude hooks persist observations without emitting provider feedback", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "orbitkeep-claude-silent-hooks-"));
+  await writeFile(path.join(root, "package.json"), "{}\n");
+  await installConsumer(root);
+  const { stateRoot } = await initializeStateRoot(root);
+  const broker = await createBrokeredSession(stateRoot, { provider: "claude", kind: "planner" });
+  for (const hook_event_name of ["SessionStart", "PostToolUse", "Stop"]) {
+    const result = await runCli(root, ["provider", "claude", "hook", "--json"], { hook_event_name, session_id: "claude-silent" }, broker.environment);
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), {});
+  }
+  const eventFiles = await readdir(path.join(stateRoot, "events"));
+  const eventText = (await Promise.all(eventFiles.filter((name) => name.endsWith(".jsonl")).map((name) => readFile(path.join(stateRoot, "events", name), "utf8")))).join("\n");
+  assert.match(eventText, /provider\.signal_observed/);
+});
+
 test("Claude broker permits bootstrap reads, blocks writes before approval, and permits writes after approval", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "orbitkeep-claude-broker-"));
   await writeFile(path.join(root, "package.json"), "{}\n");

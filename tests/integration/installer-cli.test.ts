@@ -24,12 +24,18 @@ test("consumer initialization is idempotent and preserves existing files", async
   assert.match(claude, /existing-hook/);
   assert.match(claude, /provider claude hook/);
   assert.match(claude, /provider claude hook --json/);
+  const isolatedClaude = await readFile(path.join(root, ".agent-workflow", "providers", "claude", "settings.json"), "utf8");
+  assert.match(isolatedClaude, /provider claude hook --json/);
+  assert.doesNotMatch(isolatedClaude, /existing-hook/);
   assert.match(await readFile(path.join(root, "AGENTS.md"), "utf8"), /Keep this text[\s\S]*Orbitkeep CLI Integration/);
   assert.match(await readFile(path.join(root, "CLAUDE.md"), "utf8"), /Orbitkeep Flight Director Integration[\s\S]*ask the Executive for internal framework values/);
   assert.match(await readFile(path.join(root, "CLAUDE.md"), "utf8"), /starts provider work headlessly[\s\S]*structured Flight Plan/);
   assert.match(await readFile(path.join(root, "AGENTS.md"), "utf8"), /starts provider work headlessly[\s\S]*grant Executive approval/);
   const report = await doctor(root);
   assert.equal(report.healthy, true);
+  assert.deepEqual(report.hookInspection.claudeProject.additional, ["SessionStart"]);
+  assert.equal(report.missionIsolation.claude.enabled, true);
+  assert.deepEqual(report.missionIsolation.claude.settingSources, []);
   assert.deepEqual(report.integrations, { claude: true, codex: true });
   assert.equal(report.capabilities.hooks.claude.PreToolUse.level, "enforced");
   assert.match(report.capabilities.hooks.claude.PreToolUse.reason, /connected to workflow authorization/);
@@ -176,6 +182,9 @@ test("repair reconciles a missing required provider integration", async () => {
   await writeFile(path.join(root, "package.json"), "{}\n");
   await installConsumer(root);
   await rm(path.join(root, ".claude", "settings.json"));
+  const unhealthy = await doctor(root);
+  assert.equal(unhealthy.healthy, false);
+  assert.equal(unhealthy.activation, "repair_required");
   const planned = await planRepair(root);
   assert.ok(planned.actions.some((action) => action.path === ".claude/settings.json" && action.action === "reconcile"));
   await applyRepair(root);

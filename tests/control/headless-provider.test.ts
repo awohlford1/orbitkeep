@@ -6,7 +6,7 @@ import { buildHeadlessProviderInvocation, normalizeHeadlessProviderEvent, select
 test("headless provider invocations use non-interactive JSON streams and safe planning sandboxes", () => {
   const root = path.resolve("fixture-project");
   const claude = buildHeadlessProviderInvocation("claude", "plan", root);
-  assert.deepEqual(claude.args, ["-p", "--input-format", "text", "--output-format", "stream-json", "--verbose", "--permission-prompts", "none", "--permission-mode", "plan"]);
+  assert.deepEqual(claude.args, ["-p", "--setting-sources=", "--settings", path.join(root, ".agent-workflow", "providers", "claude", "settings.json"), "--input-format", "text", "--output-format", "stream-json", "--verbose", "--permission-prompts", "none", "--permission-mode", "plan"]);
   assert.equal(claude.args.includes("--dangerously-skip-permissions"), false);
 
   const codex = buildHeadlessProviderInvocation("codex", "plan", root);
@@ -23,11 +23,11 @@ test("provider-specific JSONL events normalize to a stable Orbitkeep event vocab
   assert.equal(failure.kind, "error");
 });
 
-test("Claude Stop-hook feedback does not replace the provider-authored response", () => {
+test("a final Claude hook outcome remains authoritative and cannot be hidden by earlier assistant text", () => {
   const events = [
     normalizeHeadlessProviderEvent("claude", { type: "assistant", message: { content: [{ type: "text", text: '{"approach":["Inspect"],"acceptanceCriteria":["Report"]}' }] } }),
     normalizeHeadlessProviderEvent("claude", { type: "result", result: "Stop hook feedback prevented shutdown." }),
   ];
-  assert.equal(selectHeadlessFinalMessage(events), '{"approach":["Inspect"],"acceptanceCriteria":["Report"]}');
+  assert.equal(selectHeadlessFinalMessage(events), "Stop hook feedback prevented shutdown.");
   assert.equal(selectHeadlessFinalMessage([normalizeHeadlessProviderEvent("claude", { type: "result", result: "Fallback result" })]), "Fallback result");
 });

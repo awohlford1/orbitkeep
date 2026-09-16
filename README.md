@@ -53,8 +53,10 @@ compatibility. The legacy `--json '{...}'` inline-input form remains supported.
 
 `setup` performs transactional initialization and immediately runs the health
 check. A `ready` result means the required files and configured provider
-integrations are active. Existing users may continue to run `init` and
-`doctor` separately.
+integrations are active. It is a local installation guarantee; run the
+provider-specific doctor to verify executable availability and authentication
+for the provider you intend to use. Existing users may continue to run `init`
+and `doctor` separately.
 
 Setup also creates a durable logical Silo identity in the tracked
 `.agent-workflow/silo.json` descriptor and a machine-local instance identity in
@@ -104,6 +106,12 @@ Orbitkeep uses a discovery-only provider process to generate the Flight Plan.
 That process cannot mutate workflow state or approve its own plan. Execution is
 started in a separately brokered process only after Command Authority is active.
 Bare provider sessions are not Orbitkeep Missions.
+
+Managed Claude processes load an Orbitkeep-owned settings file and exclude the
+repository and user settings sources. This prevents pre-existing project hooks
+from blocking or replacing Mission responses. Orbitkeep preserves those hooks
+for ordinary Claude sessions and reports the affected lifecycle events in
+`doctor`; it never silently deletes project-owned configuration.
 
 Continue managing the Mission from the Orbitkeep terminal rather than entering
 the provider interface:

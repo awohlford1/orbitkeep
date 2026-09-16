@@ -62,9 +62,11 @@ export function buildHeadlessProviderInvocation(provider: SessionProvider, phase
     provider,
     phase,
     cwd,
-    // Execution remains governed by the installed Orbitkeep hooks. The
-    // provider is never given a flag that bypasses its permission system.
-    args: ["-p", "--input-format", "text", "--output-format", "stream-json", "--verbose", "--permission-prompts", "none", "--permission-mode", phase === "plan" ? "plan" : "auto"],
+    // Orbitkeep supplies its own hook settings and excludes repository/user
+    // settings from the managed child. This prevents an unrelated project hook
+    // from blocking or rewriting the provider response while retaining
+    // Claude's normal permission system.
+    args: ["-p", "--setting-sources=", "--settings", path.join(cwd, ".agent-workflow", "providers", "claude", "settings.json"), "--input-format", "text", "--output-format", "stream-json", "--verbose", "--permission-prompts", "none", "--permission-mode", phase === "plan" ? "plan" : "auto"],
   };
 }
 
@@ -113,18 +115,7 @@ function eventMessage(event: HeadlessProviderEvent): string {
   return typeof item.text === "string" ? item.text : textContent(item.content);
 }
 
-/**
- * Selects the provider-authored response rather than trailing transport or
- * hook feedback. Claude can emit a final `result` record whose text describes
- * a Stop hook after its actual `assistant` response; that diagnostic must not
- * replace a generated Flight Plan or Mission Report.
- */
 export function selectHeadlessFinalMessage(events: readonly HeadlessProviderEvent[]): string {
-  const authored = events
-    .filter((event) => event.kind === "message" || event.kind === "tool_completed")
-    .map(eventMessage)
-    .filter(Boolean);
-  if (authored.length > 0) return authored.at(-1)!;
   return events.map(eventMessage).filter(Boolean).at(-1) ?? "";
 }
 

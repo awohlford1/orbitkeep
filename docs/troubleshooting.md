@@ -28,6 +28,16 @@ Start with the health report:
 npx orbitkeep doctor
 ```
 
+## A pre-existing Claude hook blocks or rewrites a Mission response
+
+Run `npx orbitkeep doctor --json` and inspect
+`hookInspection.claudeProject.additional`. Orbitkeep-managed Missions use only
+`.agent-workflow/providers/claude/settings.json` and exclude project and user
+settings sources, so these hooks should affect bare Claude sessions only. If
+`missionIsolation.claude.enabled` is false, run `npx orbitkeep repair --plan`
+and apply the repair before starting another Mission. Do not delete a
+project-owned hook merely to make Orbitkeep report healthy.
+
 ## Installation needs repair
 
 ```sh
