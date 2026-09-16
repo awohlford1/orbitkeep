@@ -137,6 +137,11 @@ Scope:
   reject, or later. Steering creates and displays a new proposed plan revision
   from the Executive's instruction, leaves Command Authority unauthorized, and
   may repeat until a terminal decision is made.
+- Add a provider-neutral active Crew roster to `mission watch` and `supervisor
+  status`. Canonical Orbitkeep dispatches show Crew role, Operation, Run,
+  selected model, lifecycle, and timing; provider-internal tasks remain clearly
+  labeled observations when no canonical Crew mapping exists. The roster must
+  reconcile terminal outcomes across detach, reconnect, and supervisor restart.
 - Run approved provider execution beneath an authenticated per-Silo local
   supervisor so terminal exit only disconnects the user. Persist job state and
   normalized redacted activity for later status and log replay. Automatic OS
@@ -174,6 +179,9 @@ Exit criteria:
   roles, and tool results are never mislabeled as new Executive input.
 - An Executive can revise a proposed Flight Plan before approval without
   starting work, exposing internal IDs, or using low-level workflow commands.
+- A user can identify which Crew are running, what Operation each owns, which
+  model was selected, and whether each Run completed, failed, or was
+  interrupted. Reconnection must not leave terminal Crew falsely active.
 - Managed provider processes cannot grant their own Executive Clearance or
   reach an equivalent approval capability through the public CLI.
 - Claude and Codex pass the same basic headless Mission UAT, including event

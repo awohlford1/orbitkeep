@@ -101,7 +101,7 @@ This is the immediate product priority and contains nine coordinated tracks:
    immediately, and `mission watch` reconnects without requiring users to poll
    status or logs. JSON and non-interactive callers remain detached.
 
-Two CLI experience enhancements remain required before the v0.5 candidate is
+Three CLI experience enhancements remain required before the v0.5 candidate is
 complete:
 
 - **Semantic planning activity:** planning progress must render the nested
@@ -115,6 +115,16 @@ complete:
   revision, supersedes the prior proposal without authorizing execution, and
   presents the revised Flight Plan for a fresh decision. The cycle may repeat
   until the Executive approves, rejects, or defers it.
+- **Active Crew roster:** `mission watch` and `supervisor status` must show the
+  Crew members currently in motion and their lifecycle state. For
+  Orbitkeep-dispatched work, the roster records the canonical Crew role,
+  Operation and Run, selected model, start and last-activity times, and
+  running, completed, failed, or interrupted outcome. Provider task, session,
+  and process identifiers remain provenance rather than canonical identity.
+  Provider-internal work without a mapped Orbitkeep Crew identity is displayed
+  as observed provider activity and is never assigned an invented role. Start
+  and terminal events must reconcile across detach, reconnect, and supervisor
+  restart so completed Crew do not remain falsely active.
 
 The stage is complete only when a Silo remains fully functional locally and
 all new distributed metadata can be migrated without weakening governance. A
@@ -262,7 +272,8 @@ The implemented release-stabilization baseline is documented in the
 The headless Claude and Codex adapters, attached live Mission stream,
 Executive control-channel separation, `session launch` retirement, and public
 CLI cleanup are v0.5 release blockers. Semantic planning activity and
-pre-approval Flight Plan steering are also required v0.5 CLI completion work.
+pre-approval Flight Plan steering, plus the active Crew roster, are also
+required v0.5 CLI completion work.
 The full-screen terminal Mission Control TUI remains a v0.6 deliverable. Docker
 Module execution moves to v0.7, Redis deployment and remote runners move to
 v0.8, and graphical Mission Control moves to v0.9. This sequence provides a

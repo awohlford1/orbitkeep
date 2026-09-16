@@ -15,6 +15,7 @@ the exact release-candidate commit.
 | Claude-only, Codex-only, and dual-provider configuration | Provider integration and configuration tests | Enforced by `npm run verify` |
 | Provider readiness diagnostics | Read-only integration, executable, authentication, headless stream, event normalization, permission-level, and redaction tests | Enforced by `npm run verify` |
 | v0.5 interactive planning UX | Semantic planning labels plus approve, revise/steer, reject, and later Flight Plan decisions | Pending implementation and live Claude/Codex UAT |
+| v0.5 active Crew roster | Canonical Crew/Operation/Run/model lifecycle plus explicitly unattributed provider activity across detach and reconnect | Pending implementation and live multi-agent Claude/Codex UAT |
 | Session interruption and prohibited substitution | Broker and provider-control tests | Enforced by `npm run verify` |
 | Workflow dependencies, gates, budgets, retries, and routes | Workflow conformance tests | Enforced by `npm run verify` |
 | Silo, Relay, and Charter adversarial behavior | SDK contract and security-oriented tests | Enforced by `npm run verify` |
