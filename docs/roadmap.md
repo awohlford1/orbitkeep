@@ -130,6 +130,13 @@ Scope:
   launch. `Ctrl+C` detaches the viewer without stopping the Mission,
   `--detach` opts out at launch, and `mission watch` reconnects later. Scripts,
   redirected output, and `--json` remain non-blocking and detached.
+- Replace provider-envelope planning labels such as `assistant` and `user`
+  with semantic tool, command, process, and message activity. Protocol roles
+  are transport metadata and must not be shown as participant identities.
+- Present four Flight Plan choices before execution: approve, revise/steer,
+  reject, or later. Steering creates and displays a new proposed plan revision
+  from the Executive's instruction, leaves Command Authority unauthorized, and
+  may repeat until a terminal decision is made.
 - Run approved provider execution beneath an authenticated per-Silo local
   supervisor so terminal exit only disconnects the user. Persist job state and
   normalized redacted activity for later status and log replay. Automatic OS
@@ -163,6 +170,10 @@ Exit criteria:
 - Relay and Charter contracts have adversarial and offline-behavior tests.
 - A user can plan, approve, execute, observe, steer, pause, resume, and finish
   a basic Mission through Orbitkeep without entering a provider interface.
+- Planning progress identifies meaningful actions rather than provider protocol
+  roles, and tool results are never mislabeled as new Executive input.
+- An Executive can revise a proposed Flight Plan before approval without
+  starting work, exposing internal IDs, or using low-level workflow commands.
 - Managed provider processes cannot grant their own Executive Clearance or
   reach an equivalent approval capability through the public CLI.
 - Claude and Codex pass the same basic headless Mission UAT, including event

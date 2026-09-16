@@ -101,6 +101,21 @@ This is the immediate product priority and contains nine coordinated tracks:
    immediately, and `mission watch` reconnects without requiring users to poll
    status or logs. JSON and non-interactive callers remain detached.
 
+Two CLI experience enhancements remain required before the v0.5 candidate is
+complete:
+
+- **Semantic planning activity:** planning progress must render the nested
+  provider action, such as `Bash started`, `Read completed`, or a concise agent
+  message. Provider protocol roles such as Claude's `assistant` and `user`
+  envelopes must never be presented as if they identify the Executive, Crew,
+  or another human participant.
+- **Pre-approval Flight Plan steering:** the Flight Plan decision must offer
+  four choices: approve, revise/steer, reject, or later. Revise/steer collects
+  an Executive instruction, asks the discovery-only planner for a new plan
+  revision, supersedes the prior proposal without authorizing execution, and
+  presents the revised Flight Plan for a fresh decision. The cycle may repeat
+  until the Executive approves, rejects, or defers it.
+
 The stage is complete only when a Silo remains fully functional locally and
 all new distributed metadata can be migrated without weakening governance. A
 basic Mission must also complete through both headless providers with
@@ -246,8 +261,10 @@ The implemented release-stabilization baseline is documented in the
 [session broker and release integrity specification](https://github.com/awohlford1/orbitkeep/blob/main/docs/specifications/v0.5-session-broker-release-integrity.md).
 The headless Claude and Codex adapters, attached live Mission stream,
 Executive control-channel separation, `session launch` retirement, and public
-CLI cleanup are v0.5 release blockers. The full-screen terminal Mission Control
-TUI remains a v0.6 deliverable. Docker Module execution moves to v0.7, Redis deployment and
-remote runners move to v0.8, and graphical Mission Control moves to v0.9. This
-sequence provides a usable v0.5 without allowing later presentation layers to
-dictate unfinished Core semantics.
+CLI cleanup are v0.5 release blockers. Semantic planning activity and
+pre-approval Flight Plan steering are also required v0.5 CLI completion work.
+The full-screen terminal Mission Control TUI remains a v0.6 deliverable. Docker
+Module execution moves to v0.7, Redis deployment and remote runners move to
+v0.8, and graphical Mission Control moves to v0.9. This sequence provides a
+usable v0.5 without allowing later presentation layers to dictate unfinished
+Core semantics.

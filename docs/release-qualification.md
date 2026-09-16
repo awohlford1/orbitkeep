@@ -14,6 +14,7 @@ the exact release-candidate commit.
 | Clean, partial, malformed, customized, and legacy installs | Installer and transactional upgrade integration tests | Enforced by `npm run verify` |
 | Claude-only, Codex-only, and dual-provider configuration | Provider integration and configuration tests | Enforced by `npm run verify` |
 | Provider readiness diagnostics | Read-only integration, executable, authentication, headless stream, event normalization, permission-level, and redaction tests | Enforced by `npm run verify` |
+| v0.5 interactive planning UX | Semantic planning labels plus approve, revise/steer, reject, and later Flight Plan decisions | Pending implementation and live Claude/Codex UAT |
 | Session interruption and prohibited substitution | Broker and provider-control tests | Enforced by `npm run verify` |
 | Workflow dependencies, gates, budgets, retries, and routes | Workflow conformance tests | Enforced by `npm run verify` |
 | Silo, Relay, and Charter adversarial behavior | SDK contract and security-oriented tests | Enforced by `npm run verify` |
