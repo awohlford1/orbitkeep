@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEffectiveConfiguration } from "../config/index.ts";
-import { installationStateDirectory, listInstallationTransactions, PINNED_AGENT_WORKFLOW_COMMAND, planRepair } from "../installer/index.ts";
+import { CLAUDE_HOOK_COMMAND, installationStateDirectory, listInstallationTransactions, planRepair } from "../installer/index.ts";
 import { CLAUDE_HOOK_EVENTS, ClaudeProviderAdapter } from "../providers/claude/index.ts";
 import { CodexProviderAdapter } from "../providers/codex/index.ts";
 import { coreSchemaRegistry } from "../registries/index.ts";
@@ -54,8 +54,8 @@ export async function inspectClaudeHooks(filename: string): Promise<ClaudeHookIn
     for (const eventName of CLAUDE_HOOK_EVENTS) {
       const entries = value.hooks?.[eventName];
       const handlers = hookHandlers(entries);
-      const managed = handlers.filter((handler) => typeof handler.command === "string" && handler.command.includes("provider claude hook"));
-      const expectedCommand = `${PINNED_AGENT_WORKFLOW_COMMAND} provider claude hook --json`;
+      const expectedCommand = CLAUDE_HOOK_COMMAND;
+      const managed = handlers.filter((handler) => handler.command === expectedCommand);
       if (!Array.isArray(entries) || managed.length === 0) missing.push(eventName);
       else if (!managed.some((handler) => handler.command === expectedCommand)) mismatched.push(eventName);
       if (handlers.some((handler) => handler.type !== "command" || handler.command !== expectedCommand)) additional.push(eventName);

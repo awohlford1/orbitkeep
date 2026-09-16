@@ -87,7 +87,7 @@ test("mission start owns planning, approval, and headless execution outside the 
   assert.doesNotMatch(result.stdout, /ownershipToken|ORBITKEEP_SESSION_SECRET/);
   const completed = await waitForLatestJob(root, environment, "codex", response.mission.assignmentId);
   assert.equal(completed.state, "completed");
-  assert.ok(completed.response_id);
+  assert.equal(completed.response_id, undefined, "raw provider capture is opt-in");
   assert.ok(completed.event_count > 0);
   const aggregate = await new StateWorkflowRepository({ projectRoot: root }).get(response.mission.assignmentId);
   assert.equal(aggregate?.executions.length, 1);
@@ -97,6 +97,9 @@ test("mission start owns planning, approval, and headless execution outside the 
   assert.match(aggregate?.results[0]?.summary ?? "", /Execution completed through the Orbitkeep parent process/);
   const jobRecord = await readFile(path.join(root, ".agent-state", "control", "supervisor", "jobs", `${completed.job_id}.json`), "utf8");
   assert.doesNotMatch(jobRecord, /Execution completed through the Orbitkeep parent process|ownershipToken|ORBITKEEP_SESSION_SECRET/);
+  const activityLog = await readFile(path.join(root, ".agent-state", "control", "supervisor", "logs", `${completed.job_id}.jsonl`), "utf8");
+  assert.match(activityLog, /Execution completed through the Orbitkeep parent process/);
+  assert.doesNotMatch(activityLog, /ownershipToken|ORBITKEEP_SESSION_SECRET/);
   const assignmentRecord = await readFile(path.join(root, ".agent-state", "assignments", response.mission.assignmentId, "assignment", `${response.mission.assignmentId}.json`), "utf8");
   assert.match(assignmentRecord, /"execution_authority": "authorized"/);
 

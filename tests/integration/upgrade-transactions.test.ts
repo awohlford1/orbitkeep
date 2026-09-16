@@ -129,7 +129,7 @@ test("0.4.1 CLI UX migration updates machine integrations without rewriting hist
   receipt.framework_version = "0.4.1";
   await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
   const settingsPath = path.join(projectRoot, ".claude", "settings.json");
-  const settings = (await readFile(settingsPath, "utf8")).replaceAll(" provider claude hook --json", " provider claude hook");
+  const settings = (await readFile(settingsPath, "utf8")).replaceAll('node \\".agent-workflow/providers/claude/hook.cjs\\"', "npx --no-install orbitkeep provider claude hook --json");
   await writeFile(settingsPath, settings);
   const historicPath = path.join(projectRoot, ".agent-state", "events", "2020-01-03.jsonl");
   const historic = `${JSON.stringify({ schema_version: "1.0", event_id: "evt-cli-history", event_type: "decision.recorded", occurred_at: "2020-01-03T00:00:00.000Z", recorded_at: "2020-01-03T00:00:00.000Z", sequence: 1, actor: { actor_id: "manager:test", actor_type: "manager" }, recorded_by: { actor_id: "runtime-agent-workflow", actor_type: "runtime" }, data: { record_ref: { record_type: "decision", record_id: "dec-cli-history" } } })}\n`;
@@ -141,7 +141,7 @@ test("0.4.1 CLI UX migration updates machine integrations without rewriting hist
   assert.ok(plan.actions.some((item) => item.path === ".claude/settings.json" && item.kind === "reconcile-shared"));
   const result = await applyUpgrade(projectRoot, { authorizeStateMigration: true });
   assert.equal(result.status, "upgraded");
-  assert.match(await readFile(settingsPath, "utf8"), /provider claude hook --json/);
+  assert.match(await readFile(settingsPath, "utf8"), /node \\"\.agent-workflow\/providers\/claude\/hook\.cjs\\"/);
   assert.equal((JSON.parse(await readFile(receiptPath, "utf8")) as { framework_version: string }).framework_version, "0.5.0");
   assert.equal(await readFile(historicPath, "utf8"), historic);
 });

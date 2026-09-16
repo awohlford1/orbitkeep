@@ -1,4 +1,4 @@
-import { chmod, mkdir, open, readFile, readdir, rm } from "node:fs/promises";
+import { appendFile, chmod, mkdir, open, readFile, readdir, rm } from "node:fs/promises";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { createConnection, createServer, type Server } from "node:net";
 import { spawn } from "node:child_process";
@@ -60,6 +60,8 @@ const relativeRoot = path.join("control", "supervisor");
 const authRelativePath = path.join(relativeRoot, "auth.json");
 const recordRelativePath = path.join(relativeRoot, "supervisor.json");
 const jobRelativePath = (jobId: string) => path.join(relativeRoot, "jobs", `${assertPortableId(jobId, "supervisor job ID")}.json`);
+const jobLogRelativePath = (jobId: string) => path.join(relativeRoot, "logs", `${assertPortableId(jobId, "supervisor job ID")}.jsonl`);
+const DEFAULT_EVENT_LIMIT = 200;
 
 function endpointFor(stateRoot: string): string {
   const digest = createHash("sha256").update(path.resolve(stateRoot).toLowerCase()).digest("hex").slice(0, 24);
@@ -133,6 +135,12 @@ async function writeJob(stateRoot: string, job: SupervisorJobRecord): Promise<vo
 
 async function readJob(stateRoot: string, jobId: string): Promise<SupervisorJobRecord | undefined> {
   return readJson<SupervisorJobRecord>(await assertContainedStatePath(stateRoot, jobRelativePath(jobId)));
+}
+
+async function appendJobEvent(stateRoot: string, jobId: string, event: Record<string, unknown>): Promise<void> {
+  const filename = await assertContainedStatePath(stateRoot, jobLogRelativePath(jobId));
+  await mkdir(path.dirname(filename), { recursive: true });
+  await appendFile(filename, `${JSON.stringify(redactRawResponse(event))}\n`, "utf8");
 }
 
 async function listJobs(stateRoot: string, assignmentId?: string): Promise<SupervisorJobRecord[]> {
@@ -223,19 +231,26 @@ async function executeJob(stateRoot: string, input: LaunchRequest, job: Supervis
       },
       onEvent: async (event: HeadlessProviderEvent) => {
         job.event_count += 1;
-        await persistRedactedRawResponse(stateRoot, { responseId: `raw-${randomUUID()}`, provider: input.provider, sourceEvent: "mission.supervisor.event", content: { job_id: job.job_id, event_index: job.event_count, kind: event.kind, source_type: event.sourceType, data: event.data }, retentionDays: input.retentionDays, assignmentId: input.assignmentId });
+        await appendJobEvent(stateRoot, job.job_id, { recorded_at: new Date().toISOString(), source_event: "mission.supervisor.event", job_id: job.job_id, event_index: job.event_count, kind: event.kind, source_type: event.sourceType, data: event.data });
       },
     });
-    const responseId = `raw-${randomUUID()}`;
     if (leaseFailure) throw leaseFailure;
-    await persistRedactedRawResponse(stateRoot, { responseId, provider: input.provider, sourceEvent: input.sourceEvent, content: { job_id: job.job_id, kind: "final_response", final_message: result.finalMessage, event_count: result.events.length, stderr: result.stderr }, retentionDays: input.retentionDays, assignmentId: input.assignmentId });
+    await appendJobEvent(stateRoot, job.job_id, { recorded_at: new Date().toISOString(), source_event: input.sourceEvent, job_id: job.job_id, kind: "final_response", final_message: result.finalMessage, event_count: result.events.length, stderr: result.stderr });
+    const effective = await loadEffectiveConfiguration({ projectRoot: input.projectRoot, requireProjectConfig: true });
+    let responseId: string | undefined;
+    if (effective.config.providers[input.provider]?.captureRawResponses === true) {
+      responseId = `raw-${randomUUID()}`;
+      await persistRedactedRawResponse(stateRoot, { responseId, provider: input.provider, sourceEvent: input.sourceEvent, content: { job_id: job.job_id, kind: "final_response", final_message: result.finalMessage, event_count: result.events.length, stderr: result.stderr }, retentionDays: input.retentionDays, assignmentId: input.assignmentId });
+    }
     job.result_id = await submitSuccessfulMissionResult(input, result.finalMessage);
-    job.state = "completed"; if (result.providerSessionId) job.provider_session_id = result.providerSessionId; job.response_id = responseId; job.updated_at = new Date().toISOString(); await writeJob(stateRoot, job);
+    job.state = "completed"; if (result.providerSessionId) job.provider_session_id = result.providerSessionId; if (responseId) job.response_id = responseId; job.updated_at = new Date().toISOString(); await writeJob(stateRoot, job);
   } catch (error) {
     const session = job.control_session_id ? await readBrokeredSession(stateRoot, job.control_session_id) : undefined;
     job.state = session?.state === "stopped" ? "interrupted" : "failed";
     await recordUnsuccessfulMissionRun(input, job.state === "interrupted" ? "cancelled" : "failed").catch(() => undefined);
-    job.error = { code: job.state === "interrupted" ? "PROVIDER_INTERRUPTED" : String((error as { code?: string }).code ?? "PROVIDER_EXECUTION_FAILED"), message: String(redactRawResponse(error instanceof Error ? error.message : String(error))) }; job.updated_at = new Date().toISOString(); await writeJob(stateRoot, job);
+    job.error = { code: job.state === "interrupted" ? "PROVIDER_INTERRUPTED" : String((error as { code?: string }).code ?? "PROVIDER_EXECUTION_FAILED"), message: String(redactRawResponse(error instanceof Error ? error.message : String(error))) };
+    await appendJobEvent(stateRoot, job.job_id, { recorded_at: new Date().toISOString(), source_event: input.sourceEvent, job_id: job.job_id, kind: "error", error: job.error }).catch(() => undefined);
+    job.updated_at = new Date().toISOString(); await writeJob(stateRoot, job);
   } finally { clearInterval(renewalTimer); onSettled(); }
 }
 
@@ -347,10 +362,28 @@ export async function shutdownSupervisor(stateRoot: string, input: { force?: boo
     throw error;
   }
 }
-export async function readSupervisorEvents(stateRoot: string, jobId: string): Promise<unknown[]> {
+export async function readSupervisorEvents(stateRoot: string, jobId: string, limit = DEFAULT_EVENT_LIMIT): Promise<unknown[]> {
   assertPortableId(jobId, "supervisor job ID");
+  const effectiveLimit = Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 1_000) : DEFAULT_EVENT_LIMIT;
+  const logPath = await assertContainedStatePath(stateRoot, jobLogRelativePath(jobId));
+  const log = await readFile(logPath, "utf8").catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error; });
+  if (log !== undefined) {
+    return log.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line) as unknown).slice(-effectiveLimit);
+  }
+  // Compatibility fallback for jobs created before per-job logs existed. Read
+  // sequentially so a large legacy raw-response directory cannot exhaust the
+  // process file-descriptor limit.
   const directory = await assertContainedStatePath(stateRoot, "raw-responses");
   const names = await readdir(directory).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return []; throw error; });
-  const records = (await Promise.all(names.filter((name) => name.endsWith(".json")).map(async (name) => readJson<{ captured_at?: string; source_event?: string; content?: Record<string, unknown> }>(path.join(directory, name))))).filter((record) => record?.content?.job_id === jobId);
-  return records.sort((a, b) => String(a?.captured_at ?? "").localeCompare(String(b?.captured_at ?? ""))).map((record) => ({ recorded_at: record?.captured_at, source_event: record?.source_event, ...record?.content }));
+  const records: Array<{ recorded_at?: string; source_event?: string; [key: string]: unknown }> = [];
+  for (const name of names) {
+    // Canonical Orbitkeep raw responses are named raw-<id>.json. Older
+    // project hooks may have left tens of thousands of unrelated metadata
+    // files in the same directory; they cannot contain supervisor events.
+    if (!name.startsWith("raw-") || !name.endsWith(".json")) continue;
+    const record = await readJson<{ captured_at?: string; source_event?: string; content?: Record<string, unknown> }>(path.join(directory, name)).catch(() => undefined);
+    if (record?.content?.job_id !== jobId) continue;
+    records.push({ ...(record.captured_at ? { recorded_at: record.captured_at } : {}), ...(record.source_event ? { source_event: record.source_event } : {}), ...record.content });
+  }
+  return records.sort((a, b) => String(a.recorded_at ?? "").localeCompare(String(b.recorded_at ?? ""))).slice(-effectiveLimit);
 }

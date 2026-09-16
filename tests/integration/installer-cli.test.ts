@@ -22,10 +22,10 @@ test("consumer initialization is idempotent and preserves existing files", async
   assert.equal((await readFile(path.join(root, ".gitignore"), "utf8")).match(/^\.agent-state\/$/gm)?.length, 1);
   const claude = await readFile(path.join(root, ".claude", "settings.json"), "utf8");
   assert.match(claude, /existing-hook/);
-  assert.match(claude, /provider claude hook/);
-  assert.match(claude, /provider claude hook --json/);
+  assert.match(claude, /node \\"\.agent-workflow\/providers\/claude\/hook\.cjs\\"/);
+  assert.doesNotMatch(claude, /npx --no-install orbitkeep provider claude hook/);
   const isolatedClaude = await readFile(path.join(root, ".agent-workflow", "providers", "claude", "settings.json"), "utf8");
-  assert.match(isolatedClaude, /provider claude hook --json/);
+  assert.match(isolatedClaude, /node \\"\.agent-workflow\/providers\/claude\/hook\.cjs\\"/);
   assert.doesNotMatch(isolatedClaude, /existing-hook/);
   assert.match(await readFile(path.join(root, "AGENTS.md"), "utf8"), /Keep this text[\s\S]*Orbitkeep CLI Integration/);
   assert.match(await readFile(path.join(root, "CLAUDE.md"), "utf8"), /Orbitkeep Flight Director Integration[\s\S]*ask the Executive for internal framework values/);

@@ -28,6 +28,43 @@ Start with the health report:
 npx orbitkeep doctor
 ```
 
+## PowerShell windows repeatedly appear while Claude is running
+
+Current Orbitkeep installations invoke Claude hooks through
+`.agent-workflow/providers/claude/hook.cjs`, without launching `npx` for every
+provider event. Run `npx orbitkeep upgrade --plan` and apply the upgrade, or run
+`npx orbitkeep repair --plan` followed by `repair --apply`, if doctor reports
+the managed runner or hook settings as outdated. Then confirm that
+`.claude/settings.json` references the managed `hook.cjs` file.
+
+The background supervisor itself is hidden on Windows and remains controllable:
+
+```sh
+npx orbitkeep supervisor status
+npx orbitkeep mission stop --provider claude
+npx orbitkeep supervisor stop
+```
+
+Supervisor shutdown refuses to abandon active Missions unless `--force` is
+explicitly supplied.
+
+## Mission logs report `EMFILE` or contain no useful activity
+
+Upgrade or repair the installation so new Missions write one bounded per-job
+activity stream under `.agent-state/control/supervisor/logs/`. The current log
+reader remains compatible with older raw-response records but processes them
+sequentially to avoid exhausting the operating-system file limit.
+
+```sh
+npx orbitkeep mission status --provider claude
+npx orbitkeep mission logs --provider claude
+npx orbitkeep mission logs --provider claude --limit 250
+```
+
+Normal activity logs are separate from opt-in raw provider-response capture.
+Existing legacy files are preserved until the configured cleanup process
+removes records that have reached their retention deadline.
+
 ## A pre-existing Claude hook blocks or rewrites a Mission response
 
 Run `npx orbitkeep doctor --json` and inspect

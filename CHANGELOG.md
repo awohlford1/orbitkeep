@@ -44,6 +44,14 @@ public API when the migration is documented.
 - Observational Claude hooks now persist their acknowledgements silently and
   emit stdout only for documented permission decisions, preventing hook audit
   metadata from entering provider context or replacing final responses.
+- Claude hooks now use a framework-managed direct Node runner instead of an
+  `npx`/PowerShell shim per event, preventing visible console-window churn on
+  Windows and making the installed runner independently repairable.
+- Background Mission activity now uses a bounded per-job JSONL stream. Mission
+  log reads no longer open every legacy raw-response file concurrently, and
+  raw provider-response persistence remains disabled unless explicitly enabled.
+- Human Mission status, activity, stop, and supervisor-control guidance now
+  exposes useful progress and recovery actions without requiring JSON output.
 
 ### Security
 

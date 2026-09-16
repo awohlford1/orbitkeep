@@ -16,7 +16,9 @@ test("installer uses pinned binary and configured state directory", async () => 
   await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
   await installConsumer(root);
   const hooks = await readFile(path.join(root, ".claude", "settings.json"), "utf8");
-  assert.match(hooks, /npx --no-install orbitkeep provider claude hook --json/);
+  assert.match(hooks, /node \\"\.agent-workflow\/providers\/claude\/hook\.cjs\\"/);
+  assert.doesNotMatch(hooks, /npx --no-install orbitkeep provider claude hook/);
+  assert.match(await readFile(path.join(root, ".agent-workflow", "providers", "claude", "hook.cjs"), "utf8"), /require\.resolve\("orbitkeep"/);
   assert.doesNotMatch(hooks, /packages\/agent-workflow\/src/);
   assert.match(await readFile(path.join(root, ".gitignore"), "utf8"), /^\.local-agent-state\/$/m);
   const report = await doctor(root);

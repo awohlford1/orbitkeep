@@ -12,15 +12,16 @@ let tarball;
 
 assert.ok(npmEntryPoint, "Run this smoke test through npm so its portable npm entry point is available");
 
-function run(command, args, cwd) {
+function run(command, args, cwd, input) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command, args, { cwd, stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"], windowsHide: true });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => { stdout += chunk; });
     child.stderr.on("data", (chunk) => { stderr += chunk; });
     child.on("error", reject);
     child.on("exit", (code) => code === 0 ? resolve({ stdout, stderr }) : reject(new Error(`${command} ${args.join(" ")} failed (${code})\n${stdout}\n${stderr}`)));
+    if (input !== undefined) child.stdin.end(input);
   });
 }
 
@@ -74,6 +75,10 @@ try {
   const result = JSON.parse(setup.stdout);
   assert.equal(result.status, "ready", `packed CLI setup failed: ${setup.stdout}`);
   assert.equal(result.health.activation, "active");
+  const hookRunner = path.join(consumerRoot, ".agent-workflow", "providers", "claude", "hook.cjs");
+  const hook = await run(process.execPath, [hookRunner], consumerRoot, `${JSON.stringify({ hook_event_name: "SessionStart", session_id: "package-smoke", cwd: consumerRoot })}\n`);
+  assert.deepEqual(JSON.parse(hook.stdout), {}, `installed Claude hook runner returned an unexpected protocol response: ${hook.stdout}`);
+  assert.equal(hook.stderr, "", `installed Claude hook runner wrote an unexpected error: ${hook.stderr}`);
   process.stdout.write(`Package smoke test passed for ${packageJson.name}@${packageJson.version}.\n`);
 } finally {
   if (tarball) await rm(tarball, { force: true });

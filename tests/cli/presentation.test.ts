@@ -76,8 +76,12 @@ test("detached Missions explain background execution and reconnectable logs", ()
   assert.match(launched?.text ?? "", /Mission launched/);
   assert.match(launched?.text ?? "", /close this terminal/);
   assert.match(launched?.text ?? "", /mission logs/);
-  const logs = formatCliOutput({ command: "mission", mode: "human", value: { code: "MISSION_LOGS_AVAILABLE", job: { state: "completed" }, events: [{ kind: "result" }], result: "Finished safely" } });
+  assert.match(launched?.text ?? "", /mission stop --provider codex/);
+  assert.match(launched?.text ?? "", /supervisor stop/);
+  const logs = formatCliOutput({ command: "mission", mode: "human", value: { code: "MISSION_LOGS_AVAILABLE", mission: { objective: "Inspect safely" }, job: { state: "completed" }, events: [{ kind: "tool_started", source_type: "Read" }, { kind: "result", data: { result: "Finished safely" } }], result: "Finished safely" } });
   assert.match(logs?.text ?? "", /Mission activity loaded/);
+  assert.match(logs?.text ?? "", /Recent activity/);
+  assert.match(logs?.text ?? "", /tool started: Read/i);
   assert.match(logs?.text ?? "", /Finished safely/);
 });
 

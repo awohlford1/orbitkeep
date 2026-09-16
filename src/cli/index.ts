@@ -685,9 +685,11 @@ async function missionLogs(root: string, input: Input): Promise<unknown> {
   const requested = input.jobId ?? option("job");
   const job = typeof requested === "string" ? jobs.find((candidate) => candidate.job_id === requested) : jobs[0];
   if (!job) return { status: "succeeded", code: "MISSION_LOGS_EMPTY", mission: missionProjection(selected.assignment), events: [] };
-  const events = await readSupervisorEvents(selected.stateRoot, job.job_id);
+  const requestedLimit = Number(input.limit ?? option("limit") ?? 100);
+  if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 1_000) throw Object.assign(new Error("Mission log limit must be an integer from 1 to 1000."), { code: "MISSION_LOG_LIMIT_INVALID" });
+  const events = await readSupervisorEvents(selected.stateRoot, job.job_id, requestedLimit);
   const final = [...events].reverse().map((event) => event !== null && typeof event === "object" ? event as Record<string, unknown> : {}).find((event) => event.kind === "final_response");
-  return { status: "succeeded", code: "MISSION_LOGS_AVAILABLE", mission: missionProjection(selected.assignment), job, events, ...(typeof final?.final_message === "string" ? { result: final.final_message } : {}) };
+  return { status: "succeeded", code: "MISSION_LOGS_AVAILABLE", mission: missionProjection(selected.assignment), job, events, eventLimit: requestedLimit, ...(typeof final?.final_message === "string" ? { result: final.final_message } : {}) };
 }
 
 async function missionAsk(root: string, input: Input): Promise<unknown> {

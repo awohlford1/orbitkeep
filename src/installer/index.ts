@@ -33,6 +33,7 @@ const digest = (content: string) => `sha256:${createHash("sha256").update(conten
 export async function expectedManagedFiles(packageRoot = fileURLToPath(new URL("../../", import.meta.url))): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
   files[".agent-workflow/codex-manager.md"] = await readFile(path.join(packageRoot, "integrations", "codex", "MANAGER.template.md"), "utf8");
+  files[".agent-workflow/providers/claude/hook.cjs"] = await readFile(path.join(packageRoot, "integrations", "claude", "hook-runner.cjs"), "utf8");
   files[".agent-workflow/providers/claude/settings.json"] = `${JSON.stringify(await claudeHookTemplate(packageRoot), null, 2)}\n`;
   for (const contract of ["README.md", "MANAGER.md", "CONTRACTS.md", "ROLES.md"]) files[`.agent-workflow/contracts/${contract}`] = await readFile(path.join(packageRoot, "contracts", contract), "utf8");
   for (const role of (await loadRoleCatalogue()).roles) {
@@ -97,7 +98,8 @@ async function writeIfMissing(filename: string, content: string, created: string
 }
 
 export const PINNED_AGENT_WORKFLOW_COMMAND = "npx --no-install orbitkeep";
-const CLAUDE_HOOK_COMMAND = `${PINNED_AGENT_WORKFLOW_COMMAND} provider claude hook --json`;
+export const CLAUDE_HOOK_COMMAND = 'node ".agent-workflow/providers/claude/hook.cjs"';
+const PRIOR_PINNED_HOOK_COMMAND = `${PINNED_AGENT_WORKFLOW_COMMAND} provider claude hook --json`;
 const INTERIM_PINNED_HOOK_COMMAND = `${PINNED_AGENT_WORKFLOW_COMMAND} provider claude hook`;
 const LEGACY_PINNED_HOOK_COMMAND = "npx --no-install agent-workflow provider claude hook";
 const LEGACY_SOURCE_HOOK_COMMAND = "node packages/agent-workflow/src/cli/index.ts provider claude hook";
@@ -115,7 +117,7 @@ const CLAUDE_REFERENCE = `${CLAUDE_BLOCK_START}\n${CLAUDE_MARKER}\n\nFollow the 
 
 async function claudeHookTemplate(packageRoot: string): Promise<{ hooks: Record<string, unknown> }> {
   const template = await readFile(path.join(packageRoot, "integrations", "claude", "hooks.template.json"), "utf8");
-  const parsed = JSON.parse(template.replaceAll("{{agentWorkflowCommand}} provider claude hook --json", CLAUDE_HOOK_COMMAND)) as { hooks: Record<string, unknown> };
+  const parsed = JSON.parse(template.replaceAll('"{{orbitkeepHookCommand}}"', JSON.stringify(CLAUDE_HOOK_COMMAND))) as { hooks: Record<string, unknown> };
   return { hooks: parsed.hooks };
 }
 
@@ -184,8 +186,15 @@ function hasCompleteClaudeHooks(settings: unknown, desired: { hooks: Record<stri
   if (hooks === null || typeof hooks !== "object" || Array.isArray(hooks)) return false;
   return Object.keys(desired.hooks).every((eventName) => {
     const entries = (hooks as Record<string, unknown>)[eventName];
-    return Array.isArray(entries) && entries.some((entry) => JSON.stringify(entry).includes(CLAUDE_HOOK_COMMAND));
+    return Array.isArray(entries) && entries.some(hasClaudeHookCommand);
   });
+}
+
+function hasClaudeHookCommand(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasClaudeHookCommand);
+  if (value === null || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return record.command === CLAUDE_HOOK_COMMAND || Object.values(record).some(hasClaudeHookCommand);
 }
 
 function replaceManagedBlock(current: string, start: string, end: string, expected: string): string | undefined {
@@ -199,7 +208,7 @@ function replaceManagedBlock(current: string, start: string, end: string, expect
 function replaceLegacyHookCommand(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(replaceLegacyHookCommand);
   if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, replaceLegacyHookCommand(item)]));
-  return value === INTERIM_PINNED_HOOK_COMMAND || value === LEGACY_SOURCE_HOOK_COMMAND || value === LEGACY_PINNED_HOOK_COMMAND ? CLAUDE_HOOK_COMMAND : value;
+  return value === PRIOR_PINNED_HOOK_COMMAND || value === INTERIM_PINNED_HOOK_COMMAND || value === LEGACY_SOURCE_HOOK_COMMAND || value === LEGACY_PINNED_HOOK_COMMAND ? CLAUDE_HOOK_COMMAND : value;
 }
 
 async function installClaudeHooks(filename: string, template: { hooks: Record<string, unknown> }, created: string[], preserved: string[]): Promise<void> {
@@ -216,7 +225,7 @@ async function installClaudeHooks(filename: string, template: { hooks: Record<st
     if (existing !== undefined && !Array.isArray(existing)) throw new Error(`Cannot safely reconcile ${filename}: hooks.${eventName} must be an array`);
     const entries = existing === undefined ? [] : (replaceLegacyHookCommand([...existing]) as unknown[]);
     if (existing !== undefined && JSON.stringify(entries) !== JSON.stringify(existing)) changed = true;
-    const alreadyInstalled = entries.some((entry) => JSON.stringify(entry).includes(CLAUDE_HOOK_COMMAND));
+    const alreadyInstalled = entries.some(hasClaudeHookCommand);
     if (!alreadyInstalled) { entries.push(...desired as unknown[]); changed = true; }
     mergedHooks[eventName] = entries;
   }
@@ -270,6 +279,7 @@ export async function performInstallConsumer(projectRoot: string): Promise<Insta
   await writeIfMissing(path.join(root, ".agent-workflow", "config.json"), defaultConfig, created, preserved);
   const effective = await loadEffectiveConfiguration({ projectRoot: root, requireProjectConfig: true });
   await mkdir(path.join(root, ".agent-workflow", "overrides"), { recursive: true });
+  await writeManagedFrameworkAsset(root, ".agent-workflow/providers/claude/hook.cjs", await readFile(path.join(packageRoot, "integrations", "claude", "hook-runner.cjs"), "utf8"), priorManagedManifest, created, preserved);
   const hooks = await claudeHookTemplate(packageRoot);
   await installClaudeHooks(path.join(root, ".claude", "settings.json"), hooks, created, preserved);
   await writeManagedFrameworkAsset(root, ".agent-workflow/providers/claude/settings.json", `${JSON.stringify(hooks, null, 2)}\n`, priorManagedManifest, created, preserved);

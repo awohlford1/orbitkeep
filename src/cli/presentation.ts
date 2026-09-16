@@ -121,16 +121,29 @@ function missionSummary(value: unknown): string[] {
   if (result.code === "MISSION_RUNNING_IN_BACKGROUND") return [
     "✓ Mission launched", "", `Objective: ${label(mission.objective)}`, `Provider: ${label(object(result.provider).name)}`,
     `Background job: ${label(job.state, "queued")}`, "", "You may close this terminal. The Mission will continue under the local Orbitkeep supervisor.",
-    "Next: use `npx orbitkeep mission status` or `npx orbitkeep mission logs`.",
+    "Monitor: use `npx orbitkeep mission status` or `npx orbitkeep mission logs`.",
+    `Stop this Mission: \`npx orbitkeep mission stop --provider ${label(object(result.provider).name, "claude|codex")}\`.`,
+    "Supervisor control: use `npx orbitkeep supervisor status` or `npx orbitkeep supervisor stop`.",
   ];
   if (result.code === "MISSION_LOGS_AVAILABLE") {
     const events = Array.isArray(result.events) ? result.events : [];
-    return ["✓ Mission activity loaded", "", `Job: ${label(job.state)}`, `Events: ${events.length}`, ...(typeof result.result === "string" ? ["", result.result] : []), "", "Use --json for the normalized event stream."];
+    const recent = events.slice(-10).map((item) => {
+      const event = object(item); const data = object(event.data); const nestedMessage = object(data.message); const nestedItem = object(data.item);
+      const detail = typeof event.final_message === "string" ? event.final_message
+        : typeof data.result === "string" ? data.result
+        : typeof data.text === "string" ? data.text
+        : typeof nestedItem.text === "string" ? nestedItem.text
+        : typeof nestedMessage.content === "string" ? nestedMessage.content
+        : label(event.source_type);
+      const singleLine = detail.replace(/\s+/g, " ").trim();
+      return `- ${label(event.kind, "activity").replaceAll("_", " ")}${singleLine ? `: ${singleLine.slice(0, 240)}` : ""}`;
+    });
+    return ["✓ Mission activity loaded", "", `Objective: ${label(mission.objective)}`, `Job: ${label(job.state)}`, `Events retained in this view: ${events.length}`, ...(job.error ? [`Error: ${label(object(job.error).message)}`] : []), ...(recent.length ? ["", "Recent activity", ...recent] : []), ...(typeof result.result === "string" ? ["", "Mission result", result.result] : []), "", "Use --json for the normalized event stream or --limit N to change the view (maximum 1000)."];
   }
   const jobs = Array.isArray(result.jobs) ? result.jobs.map(object) : [];
   if (jobs.length > 0) {
     const latest = jobs[0]!;
-    return ["✓ Mission status", "", `Provider: ${label(result.provider)}`, `Latest job: ${label(latest.state)}`, `Events: ${String(latest.event_count ?? 0)}`, "", typeof result.nextStep === "string" ? result.nextStep : "Use `npx orbitkeep mission logs` for retained output or --json for complete Mission details."];
+    return ["✓ Mission status", "", `Objective: ${label(mission.objective, Array.isArray(result.missions) && result.missions.length === 1 ? label(object(result.missions[0]).objective) : "See --json for Mission details")}`, `Provider: ${label(result.provider, label(latest.provider))}`, `Latest job: ${label(latest.state)}`, `Events observed: ${String(latest.event_count ?? 0)}`, `Last update: ${label(latest.updated_at)}`, ...(latest.error ? [`Error: ${label(object(latest.error).message)}`] : []), "", typeof result.nextStep === "string" ? result.nextStep : ["completed", "failed", "interrupted"].includes(String(latest.state)) ? "Use `npx orbitkeep mission logs` to review the final activity and result." : "The Mission is still running. Use `npx orbitkeep mission logs` to inspect current activity."];
   }
   return genericSummary("mission", value);
 }
