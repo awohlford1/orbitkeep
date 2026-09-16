@@ -60,6 +60,8 @@ The release-stabilization design is the
 [session broker and release integrity specification](https://github.com/awohlford1/orbitkeep/blob/main/docs/specifications/v0.5-session-broker-release-integrity.md).
 The workflow-engine design is the
 [v0.5 workflow engine specification](https://github.com/awohlford1/orbitkeep/blob/main/docs/specifications/v0.5-workflow-engine.md).
+The manager execution design is the
+[v0.5 Flight Director orchestration specification](specifications/v0.5-flight-director-orchestration.md).
 
 Stabilization work completed or begun at the start of this release:
 
@@ -77,7 +79,10 @@ Live UAT demonstrated that launching users into provider-owned interfaces does
 not provide a reliable Orbitkeep workflow or Executive authorization boundary.
 Orbitkeep therefore must not publish v0.5 with interactive provider launch as
 its primary Mission path. Headless provider execution and a minimal
-Orbitkeep-owned streaming CLI are v0.5 release blockers.
+Orbitkeep-owned streaming CLI are v0.5 release blockers. Headless execution
+must run a persistent Flight Director that dynamically manages governed Crew;
+a single generic provider worker performing the whole Mission is not a
+conforming substitute.
 
 Scope:
 
@@ -116,6 +121,21 @@ Scope:
   exports.
 - Add headless Claude and Codex Docking Adapters that stream structured
   provider output without placing the user inside either provider interface.
+- Run the selected provider as a persistent Flight Director after approval,
+  not as a generic implementation worker. The Flight Director interprets the
+  human-readable Flight Plan, chooses configured specialist roles and models
+  as needs emerge, supervises results and rework, owns integration and the
+  merge lane, and reserves its own execution for economical one-off work.
+- Add a brokered, provider-neutral Crew dispatch channel. The Flight Director
+  submits a dispatch request without receiving workflow credentials; Orbitkeep
+  validates scope, role, model, permissions, gates, budget, dependencies, and
+  concurrency against the active Flight Plan and Charter before atomically
+  creating the Operation, Run, and Mission Brief and launching the specialist.
+- Return each Mission Specialist report to the same Flight Director loop. The
+  manager may accept it for integration, request bounded rework, dispatch
+  further review, ask the Executive a side question, or escalate a material
+  Course Correction. A provider process cannot mutate canonical state or
+  approve its own expansion of authority.
 - Add the provider-neutral public Mission commands `mission start`, `mission
   resume`, `mission status`, `mission logs`, `mission accept`, `mission ask`, `mission steer`, `mission pause`,
   `mission handover`, `mission stop`, and `mission cancel`, with provider selection treated as
@@ -175,6 +195,15 @@ Exit criteria:
 - Relay and Charter contracts have adversarial and offline-behavior tests.
 - A user can plan, approve, execute, observe, steer, pause, resume, and finish
   a basic Mission through Orbitkeep without entering a provider interface.
+- An approved Mission remains under a durable Flight Director loop. The
+  manager dynamically invokes appropriate configured Crew without requiring
+  the Flight Plan to preassign roles, receives their reports, controls rework
+  and integration, owns the merge lane, and escalates material decisions to
+  the Executive.
+- Every specialist invocation has a validated canonical Mission Brief and
+  Operation/Run identity before provider launch. Provider-native sub-agents
+  that bypass the dispatch channel are not represented as governed Crew and
+  cannot receive additional authority from their mere existence.
 - Planning progress identifies meaningful actions rather than provider protocol
   roles, and tool results are never mislabeled as new Executive input.
 - An Executive can revise a proposed Flight Plan before approval without
@@ -185,8 +214,10 @@ Exit criteria:
 - Managed provider processes cannot grant their own Executive Clearance or
   reach an equivalent approval capability through the public CLI.
 - Claude and Codex pass the same basic headless Mission UAT, including event
-  capture, automatic result submission, explicit parent-channel acceptance,
-  failure, and cleanup. A provider cannot accept its own Mission Report.
+  capture, manager-selected multi-Crew dispatch, specialist result return,
+  rework, integration, automatic final result submission, explicit
+  parent-channel acceptance, failure, and cleanup. A provider cannot accept
+  its own final Mission Report or expand its own authority.
 - Retired commands fail clearly and safely, and public help does not advertise
   provider sessions or internal workflow mutation commands as user workflows.
 - No central component is treated as authoritative for local state it has not

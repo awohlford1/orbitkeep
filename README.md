@@ -2,12 +2,19 @@
 
 **Keep every agent on mission.**
 
-`orbitkeep` is a provider-neutral control plane for governed agent work. A
-Flight Director coordinates Claude Code and Codex CLI Mission Specialists
-inside autonomous repository Silos. Orbitkeep supplies durable, JSON-validated
-Mission state; Flight Plan Clearances and Command Authority; Docking Adapters;
-generated Crew definitions; retention and archival tools; and an auditable
-Flight Recorder stored in the consuming project.
+`orbitkeep` is a provider-neutral control plane for governed agent work. Claude
+Code and Codex supply the intelligence; Orbitkeep supplies the operating
+boundary in which that intelligence may act. A Flight Director retains model
+autonomy to interpret an approved Flight Plan, dynamically select Mission
+Specialists, supervise their work, own the merge lane, and escalate to the
+Executive. Orbitkeep mediates those actions through identity, policy,
+permissions, Clearances, lifecycle rules, evidence, recovery controls, and an
+auditable Flight Recorder stored in the consuming project.
+
+Orbitkeep does not replace the provider model or prescribe every implementation
+step in advance. It constrains where and how autonomous work may occur. The
+v0.5 local control envelope is not an OS security sandbox; Docker-backed
+process, filesystem, network, and resource isolation is planned for v0.7.
 
 It is intentionally independent of application code. Install it into each
 repository that needs managed agent work; its runtime records stay in that
@@ -23,6 +30,9 @@ configured concurrency enforcement, cancellation propagation, Mission and Run
 resource budgets, provider-neutral usage observations, explicit bounded Run
 retry policy, typed conditional routing, reusable workflows, Charter evaluation,
 Relay contracts, and the public SDK boundary are implemented and validated.
+The persistent Flight Director loop, dynamically governed Crew dispatch, result
+return and rework, merge-lane coordination, and canonical live Crew roster are
+v0.5 release blockers and are not yet complete.
 Multi-Silo federation, durable network Relay transport, container isolation, a
 hosted control plane, Mission Control, Telemetry, and multi-user identity are
 planned capabilities and are not part of the current release.

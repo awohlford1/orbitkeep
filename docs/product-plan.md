@@ -12,6 +12,14 @@ It should let an individual, team, or organization coordinate AI agents across
 repositories while preserving explicit authority, isolation, evidence,
 recoverability, and human control over consequential actions.
 
+Claude and Codex provide the intelligence. Orbitkeep provides the governed
+operating boundary: identity, policy, permissions, Clearances, workflow state,
+action mediation, evidence, recovery, and operator control. It must preserve
+the model's creativity and execution autonomy inside the authority granted by
+the Executive and Charter rather than converting the model into a rigid,
+pre-scripted workflow engine. In v0.5 this is a local control envelope, not an
+OS security sandbox; hardened Docker isolation remains v0.7 scope.
+
 ## Current baseline
 
 Version 0.5.0 is the active development line for the local-first developer
@@ -39,7 +47,11 @@ published Mission experience: it exposes provider-specific UX, allows the
 provider environment to influence approval handling, and cannot provide the
 required provider-neutral control boundary. Before v0.5 may publish, it must
 add headless Claude and Codex execution, an Orbitkeep-owned streaming CLI, and
-a provider-inaccessible Executive Clearance channel.
+a provider-inaccessible Executive Clearance channel. The headless execution
+process must operate as a durable Flight Director rather than a generic worker:
+it dynamically selects, dispatches, supervises, reviews, and integrates Crew
+within the approved Flight Plan while Orbitkeep validates and records every
+consequential action.
 
 The current release also does not provide Docker isolation, multi-Silo
 federation, a hosted control plane, full terminal Mission Control, graphical
@@ -63,12 +75,15 @@ production availability guarantees.
 9. Orbitkeep owns the supported Mission experience. Provider interfaces are
    replaceable execution surfaces, and provider output is never an Executive
    authorization channel.
+10. The Flight Director owns execution judgment. Orbitkeep constrains and
+    records its actions but does not preassign all Crew or reduce an approved
+    Flight Plan to a rigid staffing schedule.
 
 ## Delivery sequence
 
 ### Stage 1: v0.5 Silo, workflow, and headless execution foundations
 
-This is the immediate product priority and contains nine coordinated tracks:
+This is the immediate product priority and contains ten coordinated tracks:
 
 1. **Silo identity and lifecycle:** durable identity, optional Keep and Colony
    membership, registration, capabilities, health, disconnection, degradation,
@@ -100,6 +115,16 @@ This is the immediate product priority and contains nine coordinated tracks:
    retains ownership. `Ctrl+C` detaches only the viewer, `--detach` returns
    immediately, and `mission watch` reconnects without requiring users to poll
    status or logs. JSON and non-interactive callers remain detached.
+10. **Autonomous Flight Director orchestration:** after Executive Clearance,
+    the provider manager remains the reasoning and coordination authority. It
+    dynamically chooses when work merits a configured specialist, requests a
+    governed dispatch, supervises the resulting Crew, evaluates Mission
+    Reports, requests rework when needed, performs economical one-off work,
+    owns integration and the merge lane, and reports or escalates to the
+    Executive. Orbitkeep validates each request against the approved Flight
+    Plan and Charter, creates the canonical Operation, Run, and Mission Brief,
+    launches the specialist, returns its result to the manager, and records the
+    lifecycle without exposing ownership credentials to the model.
 
 Three CLI experience enhancements remain required before the v0.5 candidate is
 complete:
@@ -130,7 +155,8 @@ The stage is complete only when a Silo remains fully functional locally and
 all new distributed metadata can be migrated without weakening governance. A
 basic Mission must also complete through both headless providers with
 Orbitkeep-owned planning, approval, detached execution, reconnectable activity,
-result handling, and cleanup.
+dynamic manager-selected Crew dispatch, specialist result and rework handling,
+merge-lane ownership, Executive escalation, final result handling, and cleanup.
 
 ### Stage 2: v0.6 terminal Mission Control TUI and supervisor hardening
 
@@ -269,7 +295,10 @@ The next implementation specifications cover v0.5 only. The first draft is the
 [Silo identity and lifecycle specification](https://github.com/awohlford1/orbitkeep/blob/main/docs/specifications/v0.5-silo-identity-lifecycle.md).
 The implemented release-stabilization baseline is documented in the
 [session broker and release integrity specification](https://github.com/awohlford1/orbitkeep/blob/main/docs/specifications/v0.5-session-broker-release-integrity.md).
-The headless Claude and Codex adapters, attached live Mission stream,
+The required manager execution model is defined in the
+[v0.5 Flight Director orchestration specification](specifications/v0.5-flight-director-orchestration.md).
+The headless Claude and Codex adapters, persistent autonomous Flight Director,
+governed dynamic Crew dispatch, attached live Mission stream,
 Executive control-channel separation, `session launch` retirement, and public
 CLI cleanup are v0.5 release blockers. Semantic planning activity and
 pre-approval Flight Plan steering, plus the active Crew roster, are also
